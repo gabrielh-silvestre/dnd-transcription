@@ -1,0 +1,162 @@
+[
+  {
+    "id": "task_62c924be-1e2",
+    "title": "Bootstrap do projeto TypeScript e contratos centrais do pipeline",
+    "kind": "implementation",
+    "phase": "phase-01",
+    "status": "completed",
+    "priority": "high",
+    "verify": [
+      "npm run build",
+      "npm test"
+    ],
+    "notes": [
+      "Bootstrap iniciado para o pipeline de transcricao; repositorio estava sem codigo de aplicacao.",
+      "Projeto Node/TypeScript inicializado com CLI, contratos de dominio, manifesto, job-state autoritativo e validacao de --resume."
+    ],
+    "metadata": {
+      "plan": "phase-01-transcription-pipeline",
+      "verification": "phase-01-transcription-pipeline-verification"
+    },
+    "dependencies": [],
+    "blockers": [],
+    "reviewStatus": "none",
+    "history": [
+      {
+        "status": "pending",
+        "at": "2026-04-10T14:22:56.816Z",
+        "note": "task created"
+      },
+      {
+        "status": "in_progress",
+        "at": "2026-04-10T15:10:53.560Z",
+        "by": "codex"
+      },
+      {
+        "status": "completed",
+        "at": "2026-04-10T15:33:04.551Z",
+        "by": "codex"
+      }
+    ],
+    "createdAt": "2026-04-10T14:22:56.816Z",
+    "updatedAt": "2026-04-10T15:33:04.551Z"
+  },
+  {
+    "id": "task_2e146222-17e",
+    "title": "Implementar segmentacao de midia com ffmpeg e persistencia de manifesto",
+    "kind": "implementation",
+    "phase": "phase-01",
+    "status": "completed",
+    "priority": "high",
+    "verify": [
+      "npm test",
+      "npm run verify:long-input (falhou no ambiente por falta de ffmpeg no PATH)"
+    ],
+    "notes": [
+      "Segmentador ffprobe/ffmpeg implementado com chunks WAV PCM 16-bit mono 16000 Hz e manifesto ordenado persistido.",
+      "FileJobStore persiste manifest.json, job-state.json, markdowns parciais e snapshot de compatibilidade para resume."
+    ],
+    "metadata": {
+      "plan": "phase-01-transcription-pipeline",
+      "verification": "phase-01-transcription-pipeline-verification"
+    },
+    "dependencies": [
+      "task_62c924be-1e2"
+    ],
+    "blockers": [],
+    "reviewStatus": "none",
+    "history": [
+      {
+        "status": "pending",
+        "at": "2026-04-10T14:23:02.033Z",
+        "note": "task created"
+      },
+      {
+        "status": "completed",
+        "at": "2026-04-10T15:33:12.861Z",
+        "by": "codex"
+      }
+    ],
+    "createdAt": "2026-04-10T14:23:02.033Z",
+    "updatedAt": "2026-04-10T15:33:12.861Z"
+  },
+  {
+    "id": "task_5c008cdb-b6c",
+    "title": "Implementar orquestracao paralela e adaptador de transcricao desacoplado",
+    "kind": "implementation",
+    "phase": "phase-01",
+    "status": "completed",
+    "priority": "high",
+    "verify": [
+      "npm test"
+    ],
+    "notes": [
+      "Orquestrador paralelo implementado com limite configuravel de concorrencia, fake transcriber e persistencia imediata do resultado por chunk.",
+      "Fluxo de resume rebaixa chunks running/failed para pending, valida snapshot e retorna exit code 2 em falha parcial reaproveitavel."
+    ],
+    "metadata": {
+      "plan": "phase-01-transcription-pipeline",
+      "verification": "phase-01-transcription-pipeline-verification"
+    },
+    "dependencies": [
+      "task_62c924be-1e2",
+      "task_2e146222-17e"
+    ],
+    "blockers": [],
+    "reviewStatus": "none",
+    "history": [
+      {
+        "status": "pending",
+        "at": "2026-04-10T14:23:07.470Z",
+        "note": "task created"
+      },
+      {
+        "status": "completed",
+        "at": "2026-04-10T15:33:22.485Z",
+        "by": "codex"
+      }
+    ],
+    "createdAt": "2026-04-10T14:23:07.470Z",
+    "updatedAt": "2026-04-10T15:33:22.485Z"
+  },
+  {
+    "id": "task_b7d48024-49d",
+    "title": "Implementar merge final, CLI operacional e smoke test end-to-end",
+    "kind": "implementation",
+    "phase": "phase-01",
+    "status": "completed",
+    "priority": "medium",
+    "verify": [
+      "npm test",
+      "npm run verify:long-input (falhou no ambiente por falta de ffmpeg no PATH)"
+    ],
+    "notes": [
+      "Merge final baseado no manifesto persistido, CLI operacional e README com uso, artefatos e extensao de provedores.",
+      "Smoke tests cobrem ordem cronologica independente da ordem de conclusao, bloqueio sem --resume, retry parcial e recuperacao de chunk running orfao."
+    ],
+    "metadata": {
+      "plan": "phase-01-transcription-pipeline",
+      "verification": "phase-01-transcription-pipeline-verification"
+    },
+    "dependencies": [
+      "task_2e146222-17e",
+      "task_5c008cdb-b6c"
+    ],
+    "blockers": [],
+    "reviewStatus": "none",
+    "history": [
+      {
+        "status": "pending",
+        "at": "2026-04-10T14:23:13.902Z",
+        "note": "task created"
+      },
+      {
+        "status": "completed",
+        "at": "2026-04-10T15:33:32.770Z",
+        "by": "codex"
+      }
+    ],
+    "createdAt": "2026-04-10T14:23:13.902Z",
+    "updatedAt": "2026-04-10T15:33:32.770Z"
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "inbox_f4b60568-beb",
+    "status": "open",
+    "createdAt": "2026-04-10T14:51:40.232Z",
+    "updatedAt": "2026-04-10T14:51:40.232Z",
+    "kind": "system",
+    "subject": "Team initialized",
+    "body": "tmux session omx-dnd-transcription-omx-team ready"
+  },
+  {
+    "id": "inbox_2cb8030e-3c4",
+    "status": "open",
+    "createdAt": "2026-04-10T15:01:25.424Z",
+    "updatedAt": "2026-04-10T15:01:25.424Z",
+    "kind": "inbox",
+    "subject": "Queue Slice 1 after plan approval",
+    "body": "Quando a revisao do plano fechar, iniciar a Slice 1 implementando a CLI com `--resume` explicito, snapshot de compatibilidade e a maquina de estados autoritativa do `job-state.json`. Validar `exit code 0/1/2` e rejeicao de `outputDir` ocupado sem `--resume` antes de qualquer codigo de provedor real.",
+    "from": "operator"
+  }
+]

@@ -1,0 +1,61 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/gabriel/personals/dnd-transcription/.codex/hooks/omx/session-start.mjs\"",
+            "statusMessage": "Loading OMX workspace context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/gabriel/personals/dnd-transcription/.codex/hooks/omx/user-prompt-submit.mjs\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/gabriel/personals/dnd-transcription/.codex/hooks/omx/stop.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/gabriel/personals/dnd-transcription/.codex/hooks/omx/pre-tool-use.mjs\"",
+            "statusMessage": "Checking OMX Bash safety policy"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/gabriel/personals/dnd-transcription/.codex/hooks/omx/post-tool-use.mjs\"",
+            "statusMessage": "Reviewing OMX Bash output"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "dnd-transcription",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build --silent && node --test dist/tests",
+    "verify:long-input": "npm run build --silent && node dist/scripts/verify-long-input.js",
+    "transcribe": "npm run build --silent && node dist/src/cli/main.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.30",
+    "typescript": "^5.8.3"
+  }
+}

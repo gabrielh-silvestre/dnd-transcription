@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ledger_a3621a0b-aa5",
+    "createdAt": "2026-04-10T14:51:40.232Z",
+    "metadata": {},
+    "kind": "worker",
+    "action": "team_init",
+    "detail": "Created team omx-team with 3 workers"
+  },
+  {
+    "id": "ledger_31b33394-36c",
+    "createdAt": "2026-04-10T15:01:25.425Z",
+    "metadata": {},
+    "kind": "worker",
+    "action": "team_message",
+    "detail": "Queue Slice 1 after plan approval: Quando a revisao do plano fechar, iniciar a Slice 1 implementando a CLI com `--resume` explicito, snapshot de compatibilidade e a maquina de estados autoritativa do `job-state.json`. Validar `exit code 0/1/2` e rejeicao de `outputDir` ocupado sem `--resume` antes de qualquer codigo de provedor real."
+  }
+]

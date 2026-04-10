@@ -1,0 +1,10 @@
+{
+  "repoPresets": [
+    "workspace-context",
+    "memory",
+    "safety",
+    "review"
+  ],
+  "personalPresets": [],
+  "updatedAt": "2026-04-10T14:51:51.737Z"
+}
