@@ -255,6 +255,77 @@ test("openai-whisper suporta falha parcial seguida de --resume com mesma assinat
   assert.equal(state.chunks.find((chunk) => chunk.index === 3)?.attempts, 1);
 });
 
+test("openai-whisper nao cria client no no-op de job sucedido com --resume", async (context) => {
+  const root = await createTempDir("openai-whisper-noop", context);
+  const outputDir = join(root, "job");
+  const inputPath = await createInputFixture(root);
+  const env = {
+    OPENAI_API_KEY: "sk-test",
+    OPENAI_WHISPER_LANGUAGE: "pt",
+    OPENAI_WHISPER_PROMPT: "glossario",
+  };
+
+  const firstRun = await runCli(
+    [
+      "--input",
+      inputPath,
+      "--output",
+      outputDir,
+      "--chunk-duration-seconds",
+      "60",
+      "--concurrency",
+      "2",
+      "--provider",
+      "openai-whisper",
+      "--cleanup-policy",
+      "keep",
+    ],
+    {
+      env,
+      createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
+      createMediaSegmenter: () => createSegmenter(),
+      createOpenAIAudioClient: () => ({
+        transcribe: async ({ audioPath }) => ({
+          text: `Texto do chunk ${extractChunkNumber(audioPath)}`,
+        }),
+      }),
+    },
+  );
+
+  assert.equal(firstRun, 0);
+
+  let clientCreations = 0;
+  const resumedRun = await runCli(
+    [
+      "--input",
+      inputPath,
+      "--output",
+      outputDir,
+      "--chunk-duration-seconds",
+      "60",
+      "--concurrency",
+      "2",
+      "--provider",
+      "openai-whisper",
+      "--cleanup-policy",
+      "keep",
+      "--resume",
+    ],
+    {
+      env,
+      createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
+      createMediaSegmenter: () => createSegmenter(),
+      createOpenAIAudioClient: () => {
+        clientCreations += 1;
+        throw new Error("client nao deveria ser criado no no-op de job succeeded");
+      },
+    },
+  );
+
+  assert.equal(resumedRun, 0);
+  assert.equal(clientCreations, 0);
+});
+
 test("openai-whisper rejeita --resume quando a assinatura do provider muda", async (context) => {
   const root = await createTempDir("openai-whisper-drift", context);
   const outputDir = join(root, "job");

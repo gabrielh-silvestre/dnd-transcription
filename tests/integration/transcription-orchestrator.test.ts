@@ -8,6 +8,7 @@ import { runCli } from "../../src/cli/main.js";
 import { runTranscriptionJob } from "../../src/application/run-transcription-job.js";
 import { type TranscriptionRequest, type TranscriptionResult } from "../../src/domain/entities/transcription-result.js";
 import { type MediaSegmenter, type SegmentMediaInput, type SegmentMediaResult } from "../../src/domain/ports/media-segmenter.js";
+import { type TranscriberBinding } from "../../src/domain/ports/transcriber-binding.js";
 import { createTranscriberSignature, type Transcriber } from "../../src/domain/ports/transcriber.js";
 import { FileJobStore } from "../../src/infrastructure/storage/file-job-store.js";
 import { createLogger } from "../../src/shared/logger.js";
@@ -68,18 +69,17 @@ class ControlledTranscriber implements Transcriber {
   }
 }
 
-class NoopSentinelTranscriber implements Transcriber {
-  public readonly name = "fake";
+class NoopSentinelBinding implements TranscriberBinding {
   public readonly signature: string;
-  public calls = 0;
+  public creations = 0;
 
   public constructor(signature: string) {
     this.signature = signature;
   }
 
-  public async transcribe(_input: TranscriptionRequest): Promise<TranscriptionResult> {
-    this.calls += 1;
-    throw new Error("transcriber nao deve ser invocado no no-op de job succeeded");
+  public createTranscriber(): Transcriber {
+    this.creations += 1;
+    throw new Error("binding nao deve materializar transcriber no no-op de job succeeded");
   }
 }
 
@@ -442,7 +442,7 @@ test("job ja sucedido vira no-op com --resume sem segmentar nem transcrever nova
 
   const stateBeforeNoop = await readFile(join(outputDir, "job-state.json"), "utf8");
   const finalMarkdownBeforeNoop = await readFile(join(outputDir, "transcript.md"), "utf8");
-  const sentinelTranscriber = new NoopSentinelTranscriber(transcriberSignature);
+  const sentinelBinding = new NoopSentinelBinding(transcriberSignature);
 
   const resumed = await runTranscriptionJob({
     inputPath,
@@ -455,13 +455,13 @@ test("job ja sucedido vira no-op com --resume sem segmentar nem transcrever nova
     resume: true,
     jobStore,
     mediaSegmenter: new FailingSegmenter(),
-    transcriber: sentinelTranscriber,
+    transcriberBinding: sentinelBinding,
     logger,
   });
 
   assert.equal(resumed.exitCode, 0);
   assert.equal(resumed.jobStatus, "succeeded");
-  assert.equal(sentinelTranscriber.calls, 0);
+  assert.equal(sentinelBinding.creations, 0);
   assert.equal(await readFile(join(outputDir, "job-state.json"), "utf8"), stateBeforeNoop);
   assert.equal(await readFile(join(outputDir, "transcript.md"), "utf8"), finalMarkdownBeforeNoop);
 });

@@ -10,6 +10,36 @@ export interface FakeTranscriberOptions {
   failChunkIndexes?: number[];
 }
 
+export function resolveFakeTranscriberOptions(env: NodeJS.ProcessEnv = process.env): FakeTranscriberOptions {
+  const latencyMs = env.FAKE_TRANSCRIBER_LATENCY_MS === undefined
+    ? 10
+    : Number.parseInt(env.FAKE_TRANSCRIBER_LATENCY_MS, 10);
+  const failChunkIndexes = (env.FAKE_TRANSCRIBER_FAIL_CHUNKS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isInteger(value) && value > 0);
+
+  return {
+    latencyMs: Number.isFinite(latencyMs) && latencyMs >= 0 ? latencyMs : 10,
+    failChunkIndexes,
+  };
+}
+
+export function createFakeTranscriberSignature(options: FakeTranscriberOptions = {}): string {
+  const latencyMs = options.latencyMs ?? 10;
+  const failChunkIndexes = [...new Set(options.failChunkIndexes ?? [])]
+    .sort((left, right) => left - right)
+    .join(",");
+
+  return createTranscriberSignature({
+    provider: "fake",
+    latencyMs,
+    failChunkIndexes,
+  });
+}
+
 export class FakeTranscriber implements Transcriber {
   public readonly name = "fake";
   public readonly signature: string;
@@ -19,28 +49,14 @@ export class FakeTranscriber implements Transcriber {
   public constructor(options: FakeTranscriberOptions = {}) {
     this.latencyMs = options.latencyMs ?? 10;
     this.failChunkIndexes = new Set(options.failChunkIndexes ?? []);
-    this.signature = createTranscriberSignature({
-      provider: this.name,
+    this.signature = createFakeTranscriberSignature({
       latencyMs: this.latencyMs,
-      failChunkIndexes: [...this.failChunkIndexes].sort((left, right) => left - right).join(","),
+      failChunkIndexes: [...this.failChunkIndexes],
     });
   }
 
   public static fromEnvironment(env: NodeJS.ProcessEnv = process.env): FakeTranscriber {
-    const latencyMs = env.FAKE_TRANSCRIBER_LATENCY_MS === undefined
-      ? 10
-      : Number.parseInt(env.FAKE_TRANSCRIBER_LATENCY_MS, 10);
-    const failChunkIndexes = (env.FAKE_TRANSCRIBER_FAIL_CHUNKS ?? "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0)
-      .map((value) => Number.parseInt(value, 10))
-      .filter((value) => Number.isInteger(value) && value > 0);
-
-    return new FakeTranscriber({
-      latencyMs: Number.isFinite(latencyMs) && latencyMs >= 0 ? latencyMs : 10,
-      failChunkIndexes,
-    });
+    return new FakeTranscriber(resolveFakeTranscriberOptions(env));
   }
 
   public async transcribe(input: TranscriptionRequest): Promise<TranscriptionResult> {

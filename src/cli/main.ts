@@ -4,7 +4,11 @@ import { basename, isAbsolute, join } from "node:path";
 import { CLI_DEFAULT_RAW_INPUT_DIR, parseArgs, type CliOptions } from "./parse-args.js";
 import { runTranscriptionJob } from "../application/run-transcription-job.js";
 import { FFmpegMediaSegmenter } from "../infrastructure/media/ffmpeg-media-segmenter.js";
-import { FakeTranscriber } from "../infrastructure/providers/fake-transcriber.js";
+import {
+  createFakeTranscriberSignature,
+  FakeTranscriber,
+  resolveFakeTranscriberOptions,
+} from "../infrastructure/providers/fake-transcriber.js";
 import { DefaultOpenAIAudioClient, type OpenAIAudioClient } from "../infrastructure/providers/openai-audio-client.js";
 import { assertOpenAIAudioChunkFitsUploadLimit } from "../infrastructure/providers/openai-audio-provider-shared.js";
 import { OpenAIAudioTranscriber } from "../infrastructure/providers/openai-audio-transcriber.js";
@@ -25,6 +29,7 @@ import { resolveJobPaths } from "../shared/paths.js";
 
 import { type JobStore } from "../domain/ports/job-store.js";
 import { type MediaSegmenter } from "../domain/ports/media-segmenter.js";
+import { bindTranscriber, type TranscriberBinding } from "../domain/ports/transcriber-binding.js";
 import { type Transcriber } from "../domain/ports/transcriber.js";
 
 export type OpenAIProviderConfig = OpenAIWhisperConfig | OpenAITranscriptionConfig;
@@ -33,6 +38,7 @@ export interface CliDependencies {
   createLogger?: () => Logger;
   createJobStore?: (outputDir: string) => JobStore;
   createMediaSegmenter?: () => MediaSegmenter;
+  createTranscriberBinding?: (options: CliOptions) => TranscriberBinding;
   createTranscriber?: (options: CliOptions) => Transcriber;
   createOpenAIAudioClient?: (config: OpenAIProviderConfig) => OpenAIAudioClient;
   env?: NodeJS.ProcessEnv;
@@ -53,42 +59,78 @@ export function resolveCliInputPath(inputPath: string): string {
 
 function createConfiguredOpenAITranscriber(
   config: OpenAIProviderConfig,
-  options: CliOptions,
   dependencies: Pick<CliDependencies, "createOpenAIAudioClient"> = {},
 ): Transcriber {
-  assertOpenAIAudioChunkFitsUploadLimit({
-    chunkDurationMs: options.chunkDurationMs,
-    uploadLimitBytes: config.uploadLimitBytes,
-    provider: config.provider,
-  });
-
   const client = dependencies.createOpenAIAudioClient?.(config)
     ?? new DefaultOpenAIAudioClient(config);
 
   return new OpenAIAudioTranscriber(config, client);
 }
 
-export function createDefaultTranscriber(
+function createConfiguredOpenAITranscriberBinding(
+  config: OpenAIProviderConfig,
+  options: CliOptions,
+  dependencies: Pick<CliDependencies, "createOpenAIAudioClient"> = {},
+): TranscriberBinding {
+  assertOpenAIAudioChunkFitsUploadLimit({
+    chunkDurationMs: options.chunkDurationMs,
+    uploadLimitBytes: config.uploadLimitBytes,
+    provider: config.provider,
+  });
+
+  return {
+    signature: config.transcriberSignature,
+    createTranscriber: () => createConfiguredOpenAITranscriber(config, dependencies),
+  };
+}
+
+function createFakeTranscriberBinding(env: NodeJS.ProcessEnv): TranscriberBinding {
+  const options = resolveFakeTranscriberOptions(env);
+
+  return {
+    signature: createFakeTranscriberSignature(options),
+    createTranscriber: () => new FakeTranscriber(options),
+  };
+}
+
+export function createDefaultTranscriberBinding(
   options: CliOptions,
   dependencies: Pick<CliDependencies, "createOpenAIAudioClient" | "env"> = {},
-): Transcriber {
+): TranscriberBinding {
   const env = dependencies.env ?? process.env;
 
   if (options.provider === "fake") {
-    return FakeTranscriber.fromEnvironment(env);
+    return createFakeTranscriberBinding(env);
   }
 
   if (options.provider === OPENAI_WHISPER_PROVIDER) {
     const config = createOpenAIWhisperConfig(env);
-    return createConfiguredOpenAITranscriber(config, options, dependencies);
+    return createConfiguredOpenAITranscriberBinding(config, options, dependencies);
   }
 
   if (options.provider === OPENAI_TRANSCRIPTION_PROVIDER) {
     const config = createOpenAITranscriptionConfig(env);
-    return createConfiguredOpenAITranscriber(config, options, dependencies);
+    return createConfiguredOpenAITranscriberBinding(config, options, dependencies);
   }
 
   throw new Error(`Provedor '${options.provider}' nao esta implementado nesta V1.`);
+}
+
+function materializeLegacyTranscriber(binding: TranscriberBinding): Transcriber {
+  const transcriber = binding.createTranscriber();
+
+  if (transcriber instanceof Promise) {
+    throw new Error("createDefaultTranscriber nao suporta factories assicronas.");
+  }
+
+  return transcriber;
+}
+
+export function createDefaultTranscriber(
+  options: CliOptions,
+  dependencies: Pick<CliDependencies, "createOpenAIAudioClient" | "env"> = {},
+): Transcriber {
+  return materializeLegacyTranscriber(createDefaultTranscriberBinding(options, dependencies));
 }
 
 export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<number> {
@@ -115,13 +157,15 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       ?? new FileJobStore(resolveJobPaths(normalizedOptions.outputDir));
     const mediaSegmenter = dependencies.createMediaSegmenter?.()
       ?? new FFmpegMediaSegmenter();
-    const transcriber = dependencies.createTranscriber?.(normalizedOptions)
-      ?? createDefaultTranscriber(normalizedOptions, { ...dependencies, env });
+    const transcriberBinding = dependencies.createTranscriberBinding?.(normalizedOptions)
+      ?? (dependencies.createTranscriber !== undefined
+        ? bindTranscriber(dependencies.createTranscriber(normalizedOptions))
+        : createDefaultTranscriberBinding(normalizedOptions, { ...dependencies, env }));
     const result = await runTranscriptionJob({
       ...normalizedOptions,
       jobStore,
       mediaSegmenter,
-      transcriber,
+      transcriberBinding,
       logger,
     });
 
