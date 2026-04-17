@@ -72,8 +72,8 @@ test("FileJobStore preserva manifest/job-state no round-trip e reconcilia resume
   const rawManifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8")) as ChunkManifestRecord;
   const rawState = JSON.parse(await readFile(join(outputDir, "job-state.json"), "utf8")) as JobStateRecord;
 
-  assert.deepEqual(manifestFromDisk, manifest);
-  assert.deepEqual(rawManifest, manifest);
+  assert.deepEqual(manifestFromDisk.toState(), manifest.toState());
+  assert.deepEqual(rawManifest, manifest.toState());
   assert.deepEqual(rawManifest, toChunkManifestRecord(outputDir, manifestFromDisk));
   assert.equal(stateFromDisk.status, "partial_failed");
   assert.equal(rawState.status, "partial_failed");
@@ -157,6 +157,6 @@ test("FileJobStore preserva manifest/job-state no round-trip e reconcilia resume
   assert.deepEqual(rawStateAfterReconcile, toJobStateRecord(outputDir, reconciledState));
   assert.notEqual(rawStateAfterReconcile.chunks[0]?.startedAt, null);
   assert.notEqual(rawStateAfterReconcile.chunks[0]?.finishedAt, null);
-  assert.deepEqual(await reloadedStore.readManifest(), manifest);
+  assert.deepEqual((await reloadedStore.readManifest()).toState(), manifest.toState());
   assert.deepEqual((await reloadedStore.readJobState()).compatibility, compatibility);
 });

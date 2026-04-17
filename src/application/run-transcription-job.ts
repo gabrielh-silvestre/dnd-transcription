@@ -4,14 +4,11 @@ import { randomUUID } from "node:crypto";
 
 import { mergeTranscripts } from "./merge-transcripts.js";
 import {
-  allChunksSucceeded,
-  assertCompatibleSnapshot,
-  computeExitCode,
-  getFailedChunks,
   type JobCompatibilitySnapshot,
   type JobState,
 } from "../domain/entities/job-state.js";
-import { type ChunkManifestEntry } from "../domain/entities/chunk-manifest.js";
+import { type ChunkManifest, type ChunkManifestEntry } from "../domain/entities/chunk-manifest.js";
+import { Job } from "../domain/entities/job.js";
 import { type JobStore } from "../domain/ports/job-store.js";
 import { type MediaSegmenter } from "../domain/ports/media-segmenter.js";
 import { type Transcriber } from "../domain/ports/transcriber.js";
@@ -100,29 +97,30 @@ async function finishBootstrappingNewJob(input: RunTranscriptionJobInput, compat
 
 async function prepareResume(input: RunTranscriptionJobInput, compatibility: JobCompatibilitySnapshot): Promise<JobState> {
   const existingState = await input.jobStore.readJobState();
+  const existingJob = Job.restore(existingState);
   await input.jobStore.readManifest();
 
-  assertCompatibleSnapshot(existingState.compatibility, compatibility);
+  existingJob.assertCompatibleSnapshot(compatibility);
 
-  if (existingState.status === "created" || existingState.status === "segmenting" || existingState.status === "fatal_error") {
-    throw new Error(`Job em estado ${existingState.status} nao pode ser retomado.`);
+  if (existingJob.status === "created" || existingJob.status === "segmenting" || existingJob.status === "fatal_error") {
+    throw new Error(`Job em estado ${existingJob.status} nao pode ser retomado.`);
   }
 
-  if (existingState.status === "succeeded") {
-    return existingState;
+  if (existingJob.status === "succeeded") {
+    return existingJob.toState();
   }
 
   return await input.jobStore.reconcileForResume();
 }
 
-function collectPendingChunks(state: JobState, manifestChunks: ChunkManifestEntry[]): ChunkManifestEntry[] {
+function collectPendingChunks(state: JobState, manifest: ChunkManifest): ChunkManifestEntry[] {
   const pendingIndexes = new Set(
-    state.chunks
-      .filter((chunk) => chunk.status === "pending")
+    Job.restore(state)
+      .getPendingChunks()
       .map((chunk) => chunk.index),
   );
 
-  return manifestChunks.filter((chunk) => pendingIndexes.has(chunk.index));
+  return manifest.chunks.filter((chunk) => pendingIndexes.has(chunk.index));
 }
 
 async function transcribeChunk(input: RunTranscriptionJobInput, chunk: ChunkManifestEntry): Promise<void> {
@@ -157,7 +155,9 @@ async function transcribeChunk(input: RunTranscriptionJobInput, chunk: ChunkMani
 }
 
 async function ensureRunningState(input: RunTranscriptionJobInput, state: JobState): Promise<JobState> {
-  if (state.status === "ready" || state.status === "partial_failed") {
+  const job = Job.restore(state);
+
+  if (job.status === "ready" || job.status === "partial_failed") {
     return await input.jobStore.updateJobStatus("running");
   }
 
@@ -165,12 +165,14 @@ async function ensureRunningState(input: RunTranscriptionJobInput, state: JobSta
 }
 
 function buildResultFromState(state: JobState): RunTranscriptionJobResult {
+  const job = Job.restore(state);
+
   return {
-    exitCode: computeExitCode(state),
-    jobStatus: state.status,
-    failedChunks: getFailedChunks(state).map((chunk) => chunk.index),
-    finalMarkdownPath: state.finalMarkdownPath,
-    errorSummary: state.errorSummary,
+    exitCode: job.exitCode,
+    jobStatus: job.status,
+    failedChunks: job.getFailedChunks().map((chunk) => chunk.index),
+    finalMarkdownPath: job.finalMarkdownPath,
+    errorSummary: job.errorSummary,
   };
 }
 
@@ -235,7 +237,7 @@ export async function runTranscriptionJob(input: RunTranscriptionJobInput): Prom
     currentState = await ensureRunningState(input, currentState);
 
     const manifest = await input.jobStore.readManifest();
-    const pendingChunks = collectPendingChunks(currentState, manifest.chunks);
+    const pendingChunks = collectPendingChunks(currentState, manifest);
 
     await runTaskPool({
       items: pendingChunks,
@@ -246,8 +248,9 @@ export async function runTranscriptionJob(input: RunTranscriptionJobInput): Prom
     });
 
     currentState = await input.jobStore.readJobState();
+    const currentJob = Job.restore(currentState);
 
-    if (getFailedChunks(currentState).length > 0) {
+    if (currentJob.getFailedChunks().length > 0) {
       currentState = await input.jobStore.updateJobStatus("partial_failed", {
         errorSummary: "Uma ou mais transcricoes falharam; o job pode ser retomado com --resume.",
       });
@@ -255,7 +258,7 @@ export async function runTranscriptionJob(input: RunTranscriptionJobInput): Prom
       return buildResultFromState(currentState);
     }
 
-    if (!allChunksSucceeded(currentState)) {
+    if (!currentJob.allChunksSucceeded()) {
       throw new Error("Estado inconsistente: ha chunks sem sucesso mesmo sem falhas registradas.");
     }
 

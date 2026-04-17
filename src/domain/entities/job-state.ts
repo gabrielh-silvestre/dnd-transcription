@@ -1,155 +1,82 @@
-import { type PipelineExitCode } from "../../shared/errors.js";
-import { type CleanupPolicy } from "../../shared/paths.js";
 import { type ChunkManifest } from "./chunk-manifest.js";
+import { Job, jobStatuses, type JobCompatibilitySnapshot, type JobState, type JobStatus } from "./job.js";
+import { JobChunk, chunkStatuses, type ChunkState, type ChunkStatus } from "./job-chunk.js";
 
-export const jobStatuses = [
-  "created",
-  "segmenting",
-  "ready",
-  "running",
-  "partial_failed",
-  "succeeded",
-  "fatal_error",
-] as const;
+export {
+  Job,
+  jobStatuses,
+  type JobCompatibilitySnapshot,
+  type JobState,
+  type JobStatus,
+} from "./job.js";
+export {
+  JobChunk,
+  chunkStatuses,
+  type ChunkState,
+  type ChunkStatus,
+} from "./job-chunk.js";
 
-export const chunkStatuses = [
-  "pending",
-  "running",
-  "succeeded",
-  "failed",
-] as const;
-
-export type JobStatus = (typeof jobStatuses)[number];
-export type ChunkStatus = (typeof chunkStatuses)[number];
-
-export interface JobCompatibilitySnapshot {
-  resolvedInputPath: string;
-  inputSizeBytes: number;
-  inputMtimeMs: number;
-  provider: string;
-  transcriberSignature: string;
-  chunkDurationSeconds: number;
+function replaceJobState(target: JobState, source: JobState): void {
+  target.version = source.version;
+  target.jobId = source.jobId;
+  target.createdAt = source.createdAt;
+  target.updatedAt = source.updatedAt;
+  target.provider = source.provider;
+  target.cleanupPolicy = source.cleanupPolicy;
+  target.status = source.status;
+  target.errorSummary = source.errorSummary;
+  target.manifestPath = source.manifestPath;
+  target.finalMarkdownPath = source.finalMarkdownPath;
+  target.compatibility = source.compatibility;
+  target.chunks = source.chunks;
 }
 
-export interface ChunkState {
-  index: number;
-  status: ChunkStatus;
-  attempts: number;
-  errorSummary: string | null;
-  markdownPath: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
+function replaceChunkState(target: ChunkState, source: ChunkState): void {
+  target.index = source.index;
+  target.status = source.status;
+  target.attempts = source.attempts;
+  target.errorSummary = source.errorSummary;
+  target.markdownPath = source.markdownPath;
+  target.startedAt = source.startedAt;
+  target.finishedAt = source.finishedAt;
 }
-
-export interface JobState {
-  version: 1;
-  jobId: string;
-  createdAt: string;
-  updatedAt: string;
-  provider: string;
-  cleanupPolicy: CleanupPolicy;
-  status: JobStatus;
-  errorSummary: string | null;
-  manifestPath: string | null;
-  finalMarkdownPath: string | null;
-  compatibility: JobCompatibilitySnapshot;
-  chunks: ChunkState[];
-}
-
-const allowedJobTransitions: Record<JobStatus, readonly JobStatus[]> = {
-  created: ["segmenting", "fatal_error"],
-  segmenting: ["ready", "fatal_error"],
-  ready: ["running", "fatal_error"],
-  running: ["succeeded", "partial_failed", "fatal_error"],
-  partial_failed: ["running"],
-  succeeded: [],
-  fatal_error: [],
-};
-
-const allowedChunkTransitions: Record<ChunkStatus, readonly ChunkStatus[]> = {
-  pending: ["running"],
-  running: ["succeeded", "failed", "pending"],
-  succeeded: [],
-  failed: ["pending"],
-};
 
 export function createInitialJobState(input: {
   jobId: string;
   provider: string;
-  cleanupPolicy: CleanupPolicy;
+  cleanupPolicy: JobState["cleanupPolicy"];
   compatibility: JobCompatibilitySnapshot;
   createdAt?: string;
 }): JobState {
-  const createdAt = input.createdAt ?? new Date().toISOString();
-
-  return {
-    version: 1,
-    jobId: input.jobId,
-    createdAt,
-    updatedAt: createdAt,
-    provider: input.provider,
-    cleanupPolicy: input.cleanupPolicy,
-    status: "created",
-    errorSummary: null,
-    manifestPath: null,
-    finalMarkdownPath: null,
-    compatibility: input.compatibility,
-    chunks: [],
-  };
+  return Job.createInitial(input).toState();
 }
 
 export function createPendingChunks(manifest: ChunkManifest): ChunkState[] {
-  return manifest.chunks.map((chunk) => ({
-    index: chunk.index,
-    status: "pending",
-    attempts: 0,
-    errorSummary: null,
-    markdownPath: null,
-    startedAt: null,
-    finishedAt: null,
-  }));
+  return Job.createPendingChunks(manifest).map((chunk) => chunk.toState());
 }
 
 export function assertJobStatusTransition(current: JobStatus, next: JobStatus): void {
-  if (current === next) {
-    return;
-  }
-
-  if (!allowedJobTransitions[current].includes(next)) {
-    throw new Error(`Transicao de job invalida: ${current} -> ${next}`);
-  }
+  Job.assertStatusTransition(current, next);
 }
 
 export function assertChunkStatusTransition(current: ChunkStatus, next: ChunkStatus): void {
-  if (current === next) {
-    return;
-  }
-
-  if (!allowedChunkTransitions[current].includes(next)) {
-    throw new Error(`Transicao de chunk invalida: ${current} -> ${next}`);
-  }
+  JobChunk.assertStatusTransition(current, next);
 }
 
 export function transitionJobStatus(state: JobState, next: JobStatus): void {
-  assertJobStatusTransition(state.status, next);
-  state.status = next;
+  const job = Job.restore(state);
+  job.updateStatus(next);
+  replaceJobState(state, job.toState());
 }
 
 export function transitionChunkStatus(chunk: ChunkState, next: ChunkStatus): void {
-  assertChunkStatusTransition(chunk.status, next);
-  chunk.status = next;
+  const jobChunk = JobChunk.restore(chunk);
+  jobChunk.transitionTo(next);
+  replaceChunkState(chunk, jobChunk.toState());
 }
 
-export function computeExitCode(state: JobState): PipelineExitCode {
-  if (state.status === "succeeded") {
-    return 0;
-  }
-
-  if (state.status === "partial_failed") {
-    return 2;
-  }
-
-  return 1;
+export function computeExitCode(state: JobState): 0 | 1 | 2 {
+  return Job.restore(state).exitCode;
 }
 
 export function getChunkState(state: JobState, chunkIndex: number): ChunkState {
@@ -163,41 +90,13 @@ export function getChunkState(state: JobState, chunkIndex: number): ChunkState {
 }
 
 export function allChunksSucceeded(state: JobState): boolean {
-  return state.chunks.every((chunk) => chunk.status === "succeeded");
+  return Job.restore(state).allChunksSucceeded();
 }
 
 export function getFailedChunks(state: JobState): ChunkState[] {
-  return state.chunks.filter((chunk) => chunk.status === "failed");
+  return Job.restore(state).getFailedChunks().map((chunk) => chunk.toState());
 }
 
 export function assertCompatibleSnapshot(expected: JobCompatibilitySnapshot, actual: JobCompatibilitySnapshot): void {
-  const mismatches: string[] = [];
-
-  if (expected.resolvedInputPath !== actual.resolvedInputPath) {
-    mismatches.push("resolvedInputPath");
-  }
-
-  if (expected.inputSizeBytes !== actual.inputSizeBytes) {
-    mismatches.push("inputSizeBytes");
-  }
-
-  if (Math.trunc(expected.inputMtimeMs) !== Math.trunc(actual.inputMtimeMs)) {
-    mismatches.push("inputMtimeMs");
-  }
-
-  if (expected.provider !== actual.provider) {
-    mismatches.push("provider");
-  }
-
-  if (expected.transcriberSignature !== actual.transcriberSignature) {
-    mismatches.push("transcriberSignature");
-  }
-
-  if (expected.chunkDurationSeconds !== actual.chunkDurationSeconds) {
-    mismatches.push("chunkDurationSeconds");
-  }
-
-  if (mismatches.length > 0) {
-    throw new Error(`Snapshot de resume incompativel: ${mismatches.join(", ")}`);
-  }
+  Job.assertCompatibleSnapshot(expected, actual);
 }

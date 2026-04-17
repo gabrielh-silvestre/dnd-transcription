@@ -1,4 +1,4 @@
-import { allChunksSucceeded } from "../domain/entities/job-state.js";
+import { Job } from "../domain/entities/job.js";
 import { type JobStore } from "../domain/ports/job-store.js";
 import { type Logger } from "../shared/logger.js";
 
@@ -13,18 +13,18 @@ export interface MergeTranscriptsResult {
 
 export async function mergeTranscripts(input: MergeTranscriptsInput): Promise<MergeTranscriptsResult> {
   const manifest = await input.jobStore.readManifest();
-  const state = await input.jobStore.readJobState();
+  const job = Job.restore(await input.jobStore.readJobState());
 
-  if (!allChunksSucceeded(state)) {
+  if (!job.allChunksSucceeded()) {
     throw new Error("Merge final requer 100% dos chunks em succeeded.");
   }
 
   const sections: string[] = [];
 
   for (const manifestChunk of manifest.chunks) {
-    const chunkState = state.chunks.find((candidate) => candidate.index === manifestChunk.index);
+    const chunkState = job.getChunk(manifestChunk.index);
 
-    if (chunkState?.markdownPath === null || chunkState?.markdownPath === undefined) {
+    if (chunkState.markdownPath === null) {
       throw new Error(`Chunk ${manifestChunk.index} nao possui markdown persistido.`);
     }
 

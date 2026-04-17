@@ -1,17 +1,12 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 
+import { type ChunkManifest } from "../../domain/entities/chunk-manifest.js";
+import { Job } from "../../domain/entities/job.js";
 import {
-  assertChunkStatusTransition,
-  createInitialJobState,
-  createPendingChunks,
-  getChunkState,
-  transitionChunkStatus,
-  transitionJobStatus,
   type JobCompatibilitySnapshot,
   type JobState,
   type JobStatus,
 } from "../../domain/entities/job-state.js";
-import { type ChunkManifest } from "../../domain/entities/chunk-manifest.js";
 import { type JobStore } from "../../domain/ports/job-store.js";
 import {
   FINAL_TRANSCRIPT_FILE_NAME,
@@ -23,7 +18,12 @@ import {
   type JobPaths,
 } from "../../shared/paths.js";
 import { type ChunkManifestRecord } from "./chunk-manifest-record.js";
-import { fromChunkManifestRecord, fromJobStateRecord, toChunkManifestRecord, toJobStateRecord } from "./job-persistence-mapper.js";
+import {
+  fromChunkManifestRecord,
+  fromJobStateRecord,
+  toChunkManifestRecord,
+  toJobStateRecord,
+} from "./job-persistence-mapper.js";
 import { type JobStateRecord } from "./job-state-record.js";
 
 async function exists(path: string): Promise<boolean> {
@@ -42,10 +42,6 @@ async function readJsonFile<T>(path: string): Promise<T> {
 
 async function writeJsonFile(path: string, value: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-}
-
-function cloneState(state: JobState): JobState {
-  return structuredClone(state) as JobState;
 }
 
 export class FileJobStore implements JobStore {
@@ -75,12 +71,13 @@ export class FileJobStore implements JobStore {
     await mkdir(this.paths.chunksDir, { recursive: true });
     await mkdir(this.paths.transcriptsDir, { recursive: true });
 
-    const state = createInitialJobState({
+    const job = Job.createInitial({
       jobId: input.jobId,
       provider: input.provider,
       cleanupPolicy: input.cleanupPolicy,
       compatibility: input.compatibility,
     });
+    const state = job.toState();
 
     await this.writeJobStateRecord(toJobStateRecord(this.paths.rootDir, state));
     return state;
@@ -96,19 +93,15 @@ export class FileJobStore implements JobStore {
   }
 
   public async hydrateChunksFromManifest(manifest: ChunkManifest): Promise<JobState> {
-    return await this.mutateState((state) => {
-      state.manifestPath = MANIFEST_FILE_NAME;
-      state.finalMarkdownPath = null;
-      state.chunks = createPendingChunks(manifest);
-      state.errorSummary = null;
-      return state;
+    return await this.mutateState((job) => {
+      job.hydrateFromManifest(manifest, MANIFEST_FILE_NAME);
     });
   }
 
   public async readJobState(): Promise<JobState> {
     await this.waitForMutations();
     const stateRecord = await this.readJobStateRecord();
-    return fromJobStateRecord(this.paths.rootDir, stateRecord);
+    return Job.restore(fromJobStateRecord(this.paths.rootDir, stateRecord)).toState();
   }
 
   public async tryReadJobState(): Promise<JobState | null> {
@@ -123,72 +116,32 @@ export class FileJobStore implements JobStore {
     errorSummary?: string | null;
     finalMarkdownPath?: string | null;
   }): Promise<JobState> {
-    return await this.mutateState((state) => {
-      transitionJobStatus(state, nextStatus);
-
-      if (metadata?.errorSummary !== undefined) {
-        state.errorSummary = metadata.errorSummary;
-      } else if (nextStatus !== "partial_failed" && nextStatus !== "fatal_error") {
-        state.errorSummary = null;
-      }
-
-      if (metadata?.finalMarkdownPath !== undefined) {
-        state.finalMarkdownPath = metadata.finalMarkdownPath;
-      }
-
-      return state;
+    return await this.mutateState((job) => {
+      job.updateStatus(nextStatus, metadata);
     });
   }
 
   public async reconcileForResume(): Promise<JobState> {
-    return await this.mutateState((state) => {
-      for (const chunk of state.chunks) {
-        if (chunk.status === "failed") {
-          transitionChunkStatus(chunk, "pending");
-          chunk.startedAt = null;
-          chunk.finishedAt = null;
-        } else if (chunk.status === "running" && chunk.finishedAt === null) {
-          assertChunkStatusTransition("running", "pending");
-          chunk.status = "pending";
-          chunk.startedAt = null;
-          chunk.finishedAt = null;
-        }
-      }
-
-      return state;
+    return await this.mutateState((job) => {
+      job.reconcileForResume();
     });
   }
 
   public async markChunkRunning(chunkIndex: number): Promise<JobState> {
-    return await this.mutateState((state) => {
-      const chunk = getChunkState(state, chunkIndex);
-      transitionChunkStatus(chunk, "running");
-      chunk.attempts += 1;
-      chunk.startedAt = new Date().toISOString();
-      chunk.finishedAt = null;
-      chunk.errorSummary = null;
-      return state;
+    return await this.mutateState((job) => {
+      job.markChunkRunning(chunkIndex);
     });
   }
 
   public async markChunkSucceeded(chunkIndex: number, markdownPath: string): Promise<JobState> {
-    return await this.mutateState((state) => {
-      const chunk = getChunkState(state, chunkIndex);
-      transitionChunkStatus(chunk, "succeeded");
-      chunk.finishedAt = new Date().toISOString();
-      chunk.markdownPath = markdownPath;
-      chunk.errorSummary = null;
-      return state;
+    return await this.mutateState((job) => {
+      job.markChunkSucceeded(chunkIndex, markdownPath);
     });
   }
 
   public async markChunkFailed(chunkIndex: number, errorSummary: string): Promise<JobState> {
-    return await this.mutateState((state) => {
-      const chunk = getChunkState(state, chunkIndex);
-      transitionChunkStatus(chunk, "failed");
-      chunk.finishedAt = new Date().toISOString();
-      chunk.errorSummary = errorSummary;
-      return state;
+    return await this.mutateState((job) => {
+      job.markChunkFailed(chunkIndex, errorSummary);
     });
   }
 
@@ -221,7 +174,7 @@ export class FileJobStore implements JobStore {
 
   // The current incremental JobStore API still mutates domain state, but disk I/O now
   // funnels through typed records so a future load/save API can reuse the same boundary.
-  private async mutateState(mutator: (state: JobState) => JobState | Promise<JobState>): Promise<JobState> {
+  private async mutateState(mutator: (job: Job) => void | Promise<void>): Promise<JobState> {
     let nextState: JobState | undefined;
 
     const previousQueue = this.mutationQueue.catch(() => undefined);
@@ -229,9 +182,10 @@ export class FileJobStore implements JobStore {
     this.mutationQueue = previousQueue.then(async () => {
       const currentRecord = await this.readJobStateRecord();
       const currentState = fromJobStateRecord(this.paths.rootDir, currentRecord);
-      const mutableState = cloneState(currentState);
-      nextState = await mutator(mutableState);
-      nextState.updatedAt = new Date().toISOString();
+      const job = Job.restore(currentState);
+      await mutator(job);
+      job.touch();
+      nextState = job.toState();
       await this.writeJobStateRecord(toJobStateRecord(this.paths.rootDir, nextState));
     });
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createChunkManifest } from "../../src/domain/entities/chunk-manifest.js";
+import { ChunkManifest, createChunkManifest } from "../../src/domain/entities/chunk-manifest.js";
 
 test("createChunkManifest ordena chunks e preserva janelas em ms", () => {
   const manifest = createChunkManifest({
@@ -24,11 +24,16 @@ test("createChunkManifest ordena chunks e preserva janelas em ms", () => {
     ],
   });
 
+  assert.equal(manifest instanceof ChunkManifest, true);
   assert.deepEqual(
     manifest.chunks.map((chunk) => chunk.index),
     [1, 2],
   );
   assert.equal(manifest.chunks[1]?.endMs, 120_000);
+  assert.deepEqual(manifest.toState().chunks.map((chunk) => chunk.chunkPath), [
+    "chunks/0001.wav",
+    "chunks/0002.wav",
+  ]);
 });
 
 test("createChunkManifest rejeita manifesto sobreposto", () => {
@@ -53,4 +58,50 @@ test("createChunkManifest rejeita manifesto sobreposto", () => {
       ],
     });
   }, /nao e monotono/);
+});
+
+test("ChunkManifest restaura estado serializado sem perder compatibilidade", () => {
+  const manifest = ChunkManifest.restore({
+    version: 1,
+    createdAt: "2026-01-02T03:04:05.000Z",
+    inputPath: "/tmp/input.mkv",
+    chunkDurationMs: 60_000,
+    totalDurationMs: 120_000,
+    chunks: [
+      {
+        index: 1,
+        startMs: 0,
+        endMs: 60_000,
+        chunkPath: "chunks/0001.wav",
+      },
+      {
+        index: 2,
+        startMs: 60_000,
+        endMs: 120_000,
+        chunkPath: "chunks/0002.wav",
+      },
+    ],
+  });
+
+  assert.deepEqual(manifest.toState(), {
+    version: 1,
+    createdAt: "2026-01-02T03:04:05.000Z",
+    inputPath: "/tmp/input.mkv",
+    chunkDurationMs: 60_000,
+    totalDurationMs: 120_000,
+    chunks: [
+      {
+        index: 1,
+        startMs: 0,
+        endMs: 60_000,
+        chunkPath: "chunks/0001.wav",
+      },
+      {
+        index: 2,
+        startMs: 60_000,
+        endMs: 120_000,
+        chunkPath: "chunks/0002.wav",
+      },
+    ],
+  });
 });
