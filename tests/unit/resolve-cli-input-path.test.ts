@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveCliInputPath } from "../../src/cli/main.js";
-import { CLI_DEFAULT_RAW_INPUT_DIR } from "../../src/cli/parse-args.js";
+import { InputPathResolver, resolveCliInputPath, CLI_DEFAULT_RAW_INPUT_DIR } from "../../src/cli/input-path-resolver.js";
 
 test("resolveCliInputPath prefixa nome de arquivo simples com diretorio raw padrao", () => {
   assert.equal(resolveCliInputPath("sessao-01.mkv"), `${CLI_DEFAULT_RAW_INPUT_DIR}/sessao-01.mkv`);
@@ -19,4 +18,10 @@ test("resolveCliInputPath preserva caminhos absolutos", () => {
     : "/tmp/sessao-01.mkv";
 
   assert.equal(resolveCliInputPath(absolutePath), absolutePath);
+});
+
+test("InputPathResolver permite customizar o diretorio raw padrao", () => {
+  const resolver = new InputPathResolver("fixtures/raw");
+
+  assert.equal(resolver.resolve("sessao-02.mkv"), "fixtures/raw/sessao-02.mkv");
 });
