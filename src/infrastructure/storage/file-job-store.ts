@@ -22,6 +22,9 @@ import {
   type CleanupPolicy,
   type JobPaths,
 } from "../../shared/paths.js";
+import { type ChunkManifestRecord } from "./chunk-manifest-record.js";
+import { fromChunkManifestRecord, fromJobStateRecord, toChunkManifestRecord, toJobStateRecord } from "./job-persistence-mapper.js";
+import { type JobStateRecord } from "./job-state-record.js";
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -79,16 +82,17 @@ export class FileJobStore implements JobStore {
       compatibility: input.compatibility,
     });
 
-    await writeJsonFile(this.paths.jobStatePath, state);
+    await this.writeJobStateRecord(toJobStateRecord(this.paths.rootDir, state));
     return state;
   }
 
   public async writeManifest(manifest: ChunkManifest): Promise<void> {
-    await writeJsonFile(this.paths.manifestPath, manifest);
+    await this.writeManifestRecord(toChunkManifestRecord(this.paths.rootDir, manifest));
   }
 
   public async readManifest(): Promise<ChunkManifest> {
-    return await readJsonFile<ChunkManifest>(this.paths.manifestPath);
+    const manifestRecord = await this.readManifestRecord();
+    return fromChunkManifestRecord(this.paths.rootDir, manifestRecord);
   }
 
   public async hydrateChunksFromManifest(manifest: ChunkManifest): Promise<JobState> {
@@ -103,7 +107,8 @@ export class FileJobStore implements JobStore {
 
   public async readJobState(): Promise<JobState> {
     await this.waitForMutations();
-    return await readJsonFile<JobState>(this.paths.jobStatePath);
+    const stateRecord = await this.readJobStateRecord();
+    return fromJobStateRecord(this.paths.rootDir, stateRecord);
   }
 
   public async tryReadJobState(): Promise<JobState | null> {
@@ -214,17 +219,20 @@ export class FileJobStore implements JobStore {
     await this.mutationQueue.catch(() => undefined);
   }
 
+  // The current incremental JobStore API still mutates domain state, but disk I/O now
+  // funnels through typed records so a future load/save API can reuse the same boundary.
   private async mutateState(mutator: (state: JobState) => JobState | Promise<JobState>): Promise<JobState> {
     let nextState: JobState | undefined;
 
     const previousQueue = this.mutationQueue.catch(() => undefined);
 
     this.mutationQueue = previousQueue.then(async () => {
-      const currentState = await readJsonFile<JobState>(this.paths.jobStatePath);
+      const currentRecord = await this.readJobStateRecord();
+      const currentState = fromJobStateRecord(this.paths.rootDir, currentRecord);
       const mutableState = cloneState(currentState);
       nextState = await mutator(mutableState);
       nextState.updatedAt = new Date().toISOString();
-      await writeJsonFile(this.paths.jobStatePath, nextState);
+      await this.writeJobStateRecord(toJobStateRecord(this.paths.rootDir, nextState));
     });
 
     await this.mutationQueue;
@@ -234,5 +242,21 @@ export class FileJobStore implements JobStore {
     }
 
     return nextState;
+  }
+
+  private async readManifestRecord(): Promise<ChunkManifestRecord> {
+    return await readJsonFile<ChunkManifestRecord>(this.paths.manifestPath);
+  }
+
+  private async writeManifestRecord(record: ChunkManifestRecord): Promise<void> {
+    await writeJsonFile(this.paths.manifestPath, record);
+  }
+
+  private async readJobStateRecord(): Promise<JobStateRecord> {
+    return await readJsonFile<JobStateRecord>(this.paths.jobStatePath);
+  }
+
+  private async writeJobStateRecord(record: JobStateRecord): Promise<void> {
+    await writeJsonFile(this.paths.jobStatePath, record);
   }
 }

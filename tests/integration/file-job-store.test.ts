@@ -5,6 +5,9 @@ import test from "node:test";
 
 import { createChunkManifest } from "../../src/domain/entities/chunk-manifest.js";
 import { createTranscriberSignature } from "../../src/domain/ports/transcriber.js";
+import { type ChunkManifestRecord } from "../../src/infrastructure/storage/chunk-manifest-record.js";
+import { toChunkManifestRecord, toJobStateRecord } from "../../src/infrastructure/storage/job-persistence-mapper.js";
+import { type JobStateRecord } from "../../src/infrastructure/storage/job-state-record.js";
 import { FileJobStore } from "../../src/infrastructure/storage/file-job-store.js";
 import { resolveJobPaths } from "../../src/shared/paths.js";
 import { createTempDir } from "../helpers/temp-dir.js";
@@ -66,26 +69,12 @@ test("FileJobStore preserva manifest/job-state no round-trip e reconcilia resume
   const reloadedStore = new FileJobStore(resolveJobPaths(outputDir));
   const manifestFromDisk = await reloadedStore.readManifest();
   const stateFromDisk = await reloadedStore.readJobState();
-  const rawManifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8")) as typeof manifest;
-  const rawState = JSON.parse(await readFile(join(outputDir, "job-state.json"), "utf8")) as {
-    status: string;
-    manifestPath: string | null;
-    finalMarkdownPath: string | null;
-    errorSummary: string | null;
-    compatibility: typeof compatibility;
-    chunks: Array<{
-      index: number;
-      status: string;
-      attempts: number;
-      errorSummary: string | null;
-      markdownPath: string | null;
-      startedAt: string | null;
-      finishedAt: string | null;
-    }>;
-  };
+  const rawManifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8")) as ChunkManifestRecord;
+  const rawState = JSON.parse(await readFile(join(outputDir, "job-state.json"), "utf8")) as JobStateRecord;
 
   assert.deepEqual(manifestFromDisk, manifest);
   assert.deepEqual(rawManifest, manifest);
+  assert.deepEqual(rawManifest, toChunkManifestRecord(outputDir, manifestFromDisk));
   assert.equal(stateFromDisk.status, "partial_failed");
   assert.equal(rawState.status, "partial_failed");
   assert.equal(rawState.manifestPath, "manifest.json");
@@ -117,24 +106,10 @@ test("FileJobStore preserva manifest/job-state no round-trip e reconcilia resume
       },
     ],
   );
+  assert.deepEqual(rawState, toJobStateRecord(outputDir, stateFromDisk));
 
   const reconciledState = await reloadedStore.reconcileForResume();
-  const rawStateAfterReconcile = JSON.parse(await readFile(join(outputDir, "job-state.json"), "utf8")) as {
-    status: string;
-    manifestPath: string | null;
-    finalMarkdownPath: string | null;
-    errorSummary: string | null;
-    compatibility: typeof compatibility;
-    chunks: Array<{
-      index: number;
-      status: string;
-      attempts: number;
-      errorSummary: string | null;
-      markdownPath: string | null;
-      startedAt: string | null;
-      finishedAt: string | null;
-    }>;
-  };
+  const rawStateAfterReconcile = JSON.parse(await readFile(join(outputDir, "job-state.json"), "utf8")) as JobStateRecord;
 
   assert.equal(reconciledState.status, "partial_failed");
   assert.equal(reconciledState.chunks[0]?.status, "succeeded");
@@ -179,6 +154,7 @@ test("FileJobStore preserva manifest/job-state no round-trip e reconcilia resume
       },
     ],
   );
+  assert.deepEqual(rawStateAfterReconcile, toJobStateRecord(outputDir, reconciledState));
   assert.notEqual(rawStateAfterReconcile.chunks[0]?.startedAt, null);
   assert.notEqual(rawStateAfterReconcile.chunks[0]?.finishedAt, null);
   assert.deepEqual(await reloadedStore.readManifest(), manifest);
