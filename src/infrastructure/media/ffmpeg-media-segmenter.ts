@@ -5,6 +5,7 @@ import { createChunkManifest, type ChunkManifestEntry } from "../../domain/entit
 import { type MediaSegmenter, type SegmentMediaInput, type SegmentMediaResult } from "../../domain/ports/media-segmenter.js";
 import { formatChunkAudioFileName, normalizeRelativePath } from "../../shared/paths.js";
 import { runCommand } from "../../shared/process.js";
+import { chunkAudioFormat } from "../../shared/chunk-audio-format.js";
 import { probeMedia } from "./ffprobe.js";
 
 export interface FFmpegMediaSegmenterOptions {
@@ -62,11 +63,11 @@ export class FFmpegMediaSegmenter implements MediaSegmenter {
           toSeconds(endMs - startMs),
           "-vn",
           "-ac",
-          "1",
+          String(chunkAudioFormat.channels),
           "-ar",
-          "16000",
+          String(chunkAudioFormat.sampleRateHz),
           "-sample_fmt",
-          "s16",
+          chunkAudioFormat.sampleFormat,
           outputPath,
         ],
         {

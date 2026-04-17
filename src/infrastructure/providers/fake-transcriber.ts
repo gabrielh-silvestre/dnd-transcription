@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { type TranscriptionRequest, type TranscriptionResult } from "../../domain/entities/transcription-result.js";
-import { type Transcriber } from "../../domain/ports/transcriber.js";
+import { createTranscriberSignature, type Transcriber } from "../../domain/ports/transcriber.js";
 import { formatChunkIndex } from "../../shared/paths.js";
 
 export interface FakeTranscriberOptions {
@@ -12,12 +12,18 @@ export interface FakeTranscriberOptions {
 
 export class FakeTranscriber implements Transcriber {
   public readonly name = "fake";
+  public readonly signature: string;
   private readonly latencyMs: number;
   private readonly failChunkIndexes: Set<number>;
 
   public constructor(options: FakeTranscriberOptions = {}) {
     this.latencyMs = options.latencyMs ?? 10;
     this.failChunkIndexes = new Set(options.failChunkIndexes ?? []);
+    this.signature = createTranscriberSignature({
+      provider: this.name,
+      latencyMs: this.latencyMs,
+      failChunkIndexes: [...this.failChunkIndexes].sort((left, right) => left - right).join(","),
+    });
   }
 
   public static fromEnvironment(env: NodeJS.ProcessEnv = process.env): FakeTranscriber {

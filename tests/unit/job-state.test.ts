@@ -21,6 +21,7 @@ test("maquina de estados do job respeita transicoes autoritativas", () => {
       inputSizeBytes: 10,
       inputMtimeMs: 20,
       provider: "fake",
+      transcriberSignature: "{\"provider\":\"fake\"}",
       chunkDurationSeconds: 60,
     },
   });
@@ -65,15 +66,17 @@ test("resume rejeita snapshot incompativel", () => {
         inputSizeBytes: 10,
         inputMtimeMs: 20,
         provider: "fake",
+        transcriberSignature: "{\"provider\":\"fake\",\"prompt\":null}",
         chunkDurationSeconds: 600,
       },
       {
         resolvedInputPath: "/tmp/input-a.mkv",
         inputSizeBytes: 10,
         inputMtimeMs: 20,
-        provider: "other",
+        provider: "fake",
+        transcriberSignature: "{\"provider\":\"fake\",\"prompt\":\"glossario\"}",
         chunkDurationSeconds: 600,
       },
     );
-  }, /provider/);
+  }, /transcriberSignature/);
 });

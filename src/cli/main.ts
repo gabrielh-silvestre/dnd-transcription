@@ -1,10 +1,25 @@
 import { pathToFileURL } from "node:url";
+import { basename, isAbsolute, join } from "node:path";
 
-import { parseArgs } from "./parse-args.js";
+import { CLI_DEFAULT_RAW_INPUT_DIR, parseArgs, type CliOptions } from "./parse-args.js";
 import { runTranscriptionJob } from "../application/run-transcription-job.js";
 import { FFmpegMediaSegmenter } from "../infrastructure/media/ffmpeg-media-segmenter.js";
 import { FakeTranscriber } from "../infrastructure/providers/fake-transcriber.js";
+import { DefaultOpenAIAudioClient, type OpenAIAudioClient } from "../infrastructure/providers/openai-audio-client.js";
+import { assertOpenAIAudioChunkFitsUploadLimit } from "../infrastructure/providers/openai-audio-provider-shared.js";
+import { OpenAIAudioTranscriber } from "../infrastructure/providers/openai-audio-transcriber.js";
+import {
+  createOpenAITranscriptionConfig,
+  OPENAI_TRANSCRIPTION_PROVIDER,
+  type OpenAITranscriptionConfig,
+} from "../infrastructure/providers/openai-transcription-config.js";
+import {
+  createOpenAIWhisperConfig,
+  OPENAI_WHISPER_PROVIDER,
+  type OpenAIWhisperConfig,
+} from "../infrastructure/providers/openai-whisper-config.js";
 import { FileJobStore } from "../infrastructure/storage/file-job-store.js";
+import { loadEnvFile } from "../shared/env-file.js";
 import { createLogger, type Logger } from "../shared/logger.js";
 import { resolveJobPaths } from "../shared/paths.js";
 
@@ -12,19 +27,68 @@ import { type JobStore } from "../domain/ports/job-store.js";
 import { type MediaSegmenter } from "../domain/ports/media-segmenter.js";
 import { type Transcriber } from "../domain/ports/transcriber.js";
 
+export type OpenAIProviderConfig = OpenAIWhisperConfig | OpenAITranscriptionConfig;
+
 export interface CliDependencies {
   createLogger?: () => Logger;
   createJobStore?: (outputDir: string) => JobStore;
   createMediaSegmenter?: () => MediaSegmenter;
-  createTranscriber?: (provider: string) => Transcriber;
+  createTranscriber?: (options: CliOptions) => Transcriber;
+  createOpenAIAudioClient?: (config: OpenAIProviderConfig) => OpenAIAudioClient;
+  env?: NodeJS.ProcessEnv;
+  cwd?: string;
 }
 
-function createDefaultTranscriber(provider: string): Transcriber {
-  if (provider === "fake") {
-    return FakeTranscriber.fromEnvironment();
+export function resolveCliInputPath(inputPath: string): string {
+  if (isAbsolute(inputPath)) {
+    return inputPath;
   }
 
-  throw new Error(`Provedor '${provider}' nao esta implementado nesta V1.`);
+  if (basename(inputPath) !== inputPath) {
+    return inputPath;
+  }
+
+  return join(CLI_DEFAULT_RAW_INPUT_DIR, inputPath);
+}
+
+function createConfiguredOpenAITranscriber(
+  config: OpenAIProviderConfig,
+  options: CliOptions,
+  dependencies: Pick<CliDependencies, "createOpenAIAudioClient"> = {},
+): Transcriber {
+  assertOpenAIAudioChunkFitsUploadLimit({
+    chunkDurationMs: options.chunkDurationMs,
+    uploadLimitBytes: config.uploadLimitBytes,
+    provider: config.provider,
+  });
+
+  const client = dependencies.createOpenAIAudioClient?.(config)
+    ?? new DefaultOpenAIAudioClient(config);
+
+  return new OpenAIAudioTranscriber(config, client);
+}
+
+export function createDefaultTranscriber(
+  options: CliOptions,
+  dependencies: Pick<CliDependencies, "createOpenAIAudioClient" | "env"> = {},
+): Transcriber {
+  const env = dependencies.env ?? process.env;
+
+  if (options.provider === "fake") {
+    return FakeTranscriber.fromEnvironment(env);
+  }
+
+  if (options.provider === OPENAI_WHISPER_PROVIDER) {
+    const config = createOpenAIWhisperConfig(env);
+    return createConfiguredOpenAITranscriber(config, options, dependencies);
+  }
+
+  if (options.provider === OPENAI_TRANSCRIPTION_PROVIDER) {
+    const config = createOpenAITranscriptionConfig(env);
+    return createConfiguredOpenAITranscriber(config, options, dependencies);
+  }
+
+  throw new Error(`Provedor '${options.provider}' nao esta implementado nesta V1.`);
 }
 
 export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<number> {
@@ -39,14 +103,22 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     const { options } = parsed;
-    const jobStore = dependencies.createJobStore?.(options.outputDir)
-      ?? new FileJobStore(resolveJobPaths(options.outputDir));
+    const normalizedOptions: CliOptions = {
+      ...options,
+      inputPath: resolveCliInputPath(options.inputPath),
+    };
+    const env = await loadEnvFile({
+      env: dependencies.env,
+      cwd: dependencies.cwd,
+    });
+    const jobStore = dependencies.createJobStore?.(normalizedOptions.outputDir)
+      ?? new FileJobStore(resolveJobPaths(normalizedOptions.outputDir));
     const mediaSegmenter = dependencies.createMediaSegmenter?.()
       ?? new FFmpegMediaSegmenter();
-    const transcriber = dependencies.createTranscriber?.(options.provider)
-      ?? createDefaultTranscriber(options.provider);
+    const transcriber = dependencies.createTranscriber?.(normalizedOptions)
+      ?? createDefaultTranscriber(normalizedOptions, { ...dependencies, env });
     const result = await runTranscriptionJob({
-      ...options,
+      ...normalizedOptions,
       jobStore,
       mediaSegmenter,
       transcriber,

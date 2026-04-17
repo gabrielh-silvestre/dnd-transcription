@@ -59,6 +59,7 @@ function renderChunkMarkdown(chunk: ChunkManifestEntry, transcribedMarkdown: str
 async function createCompatibilitySnapshot(input: {
   inputPath: string;
   provider: string;
+  transcriberSignature: string;
   chunkDurationSeconds: number;
 }): Promise<JobCompatibilitySnapshot> {
   const resolvedInputPath = resolve(input.inputPath);
@@ -69,6 +70,7 @@ async function createCompatibilitySnapshot(input: {
     inputSizeBytes: inputStat.size,
     inputMtimeMs: inputStat.mtimeMs,
     provider: input.provider,
+    transcriberSignature: input.transcriberSignature,
     chunkDurationSeconds: input.chunkDurationSeconds,
   };
 }
@@ -197,6 +199,7 @@ export async function runTranscriptionJob(input: RunTranscriptionJobInput): Prom
     const compatibility = await createCompatibilitySnapshot({
       inputPath: input.inputPath,
       provider: input.provider,
+      transcriberSignature: input.transcriber.signature,
       chunkDurationSeconds: input.chunkDurationSeconds,
     });
     const artifactsExist = await input.jobStore.hasPersistedJobArtifacts();

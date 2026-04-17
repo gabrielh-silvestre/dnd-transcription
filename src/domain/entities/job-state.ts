@@ -27,6 +27,7 @@ export interface JobCompatibilitySnapshot {
   inputSizeBytes: number;
   inputMtimeMs: number;
   provider: string;
+  transcriberSignature: string;
   chunkDurationSeconds: number;
 }
 
@@ -186,6 +187,10 @@ export function assertCompatibleSnapshot(expected: JobCompatibilitySnapshot, act
 
   if (expected.provider !== actual.provider) {
     mismatches.push("provider");
+  }
+
+  if (expected.transcriberSignature !== actual.transcriberSignature) {
+    mismatches.push("transcriberSignature");
   }
 
   if (expected.chunkDurationSeconds !== actual.chunkDurationSeconds) {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseArgs, toChunkDurationMs } from "../../src/cli/parse-args.js";
+import { CLI_DEFAULT_RAW_INPUT_DIR, parseArgs, toChunkDurationMs } from "../../src/cli/parse-args.js";
 
 test("parseArgs converte segundos para ms e preserva --resume", () => {
   const parsed = parseArgs([
@@ -35,6 +35,13 @@ test("parseArgs retorna help quando solicitado", () => {
   const parsed = parseArgs(["--help"]);
 
   assert.equal(parsed.kind, "help");
+
+  if (parsed.kind !== "help") {
+    throw new Error("Resultado inesperado");
+  }
+
+  assert.match(parsed.text, /openai-transcription/);
+  assert.match(parsed.text, new RegExp(CLI_DEFAULT_RAW_INPUT_DIR.replace(".", "\\.")));
 });
 
 test("parseArgs rejeita cleanup policy invalido", () => {

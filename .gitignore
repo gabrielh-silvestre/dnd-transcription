@@ -1,3 +1,7 @@
 dist/
 node_modules/
 tmp/
+.env
+.omc/
+.omx/
+.ignore/raw/

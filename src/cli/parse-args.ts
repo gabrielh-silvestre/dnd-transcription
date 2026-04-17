@@ -1,8 +1,13 @@
 import { ValidationError } from "../shared/errors.js";
 import { type CleanupPolicy } from "../shared/paths.js";
 
+export const CLI_DEFAULT_RAW_INPUT_DIR = ".ignore/raw";
+
 export const CLI_USAGE = `Uso:
-  npm run transcribe -- --input <arquivo.mkv> --output <diretorio> --chunk-duration-seconds <segundos> --concurrency <n> --provider <nome> --cleanup-policy <on-success|keep> [--resume]
+  npm run transcribe -- --input <arquivo.mkv> --output <diretorio> --chunk-duration-seconds <segundos> --concurrency <n> --provider <fake|openai-whisper|openai-transcription> --cleanup-policy <on-success|keep> [--resume]
+
+Obs:
+  - Se --input receber apenas o nome do arquivo (ex.: sessao.mkv), a CLI busca em ${CLI_DEFAULT_RAW_INPUT_DIR}/sessao.mkv.
 `;
 
 export interface CliOptions {

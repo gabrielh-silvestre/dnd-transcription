@@ -7,7 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { runCli } from "../../src/cli/main.js";
 import { runTranscriptionJob } from "../../src/application/run-transcription-job.js";
 import { type TranscriptionRequest, type TranscriptionResult } from "../../src/domain/entities/transcription-result.js";
-import { type Transcriber } from "../../src/domain/ports/transcriber.js";
+import { createTranscriberSignature, type Transcriber } from "../../src/domain/ports/transcriber.js";
 import { FileJobStore } from "../../src/infrastructure/storage/file-job-store.js";
 import { createLogger } from "../../src/shared/logger.js";
 import { resolveJobPaths } from "../../src/shared/paths.js";
@@ -15,7 +15,11 @@ import { createTempDir } from "../helpers/temp-dir.js";
 import { StubMediaSegmenter } from "../helpers/stub-media-segmenter.js";
 
 class OrderedTranscriber implements Transcriber {
-  public readonly name = "ordered";
+  public readonly name = "fake";
+  public readonly signature = createTranscriberSignature({
+    provider: "fake",
+    variant: "ordered",
+  });
 
   public async transcribe(input: TranscriptionRequest): Promise<TranscriptionResult> {
     const delayByChunk = new Map([
@@ -33,11 +37,19 @@ class OrderedTranscriber implements Transcriber {
 }
 
 class ControlledTranscriber implements Transcriber {
-  public readonly name = "controlled";
+  public readonly name = "fake";
+  public readonly signature: string;
   private readonly failuresRemaining: Map<number, number>;
 
-  public constructor(failuresRemaining: Record<number, number>) {
+  public constructor(
+    failuresRemaining: Record<number, number>,
+    signature = createTranscriberSignature({
+      provider: "fake",
+      variant: "controlled",
+    }),
+  ) {
     this.failuresRemaining = new Map(Object.entries(failuresRemaining).map(([key, value]) => [Number(key), value]));
+    this.signature = signature;
   }
 
   public async transcribe(input: TranscriptionRequest): Promise<TranscriptionResult> {
@@ -247,7 +259,14 @@ test("resume rejeita snapshot incompativel e recupera chunk running orfao", asyn
     resume: true,
     jobStore,
     mediaSegmenter: createSegmenter(),
-    transcriber: new ControlledTranscriber({}),
+    transcriber: new ControlledTranscriber(
+      {},
+      createTranscriberSignature({
+        provider: "fake",
+        variant: "controlled",
+        prompt: "contexto-alterado",
+      }),
+    ),
     logger,
   });
 
@@ -267,6 +286,10 @@ test("resume rejeita snapshot incompativel e recupera chunk running orfao", asyn
       inputSizeBytes: 7,
       inputMtimeMs: (await stat(orphanInputPath)).mtimeMs,
       provider: "fake",
+      transcriberSignature: createTranscriberSignature({
+        provider: "fake",
+        variant: "controlled",
+      }),
       chunkDurationSeconds: 60,
     },
   });
