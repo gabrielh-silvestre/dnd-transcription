@@ -6,10 +6,10 @@ import {
 } from "./default-transcriber-binding-factory.js";
 import { InputPathResolver } from "./input-path-resolver.js";
 import {
-  runTranscriptionJob,
-  type RunTranscriptionJobInput,
-  type RunTranscriptionJobResult,
-} from "../application/run-transcription-job.js";
+  RunTranscriptionJobUseCase,
+  type RunTranscriptionJobUseCaseInput,
+  type RunTranscriptionJobUseCaseResult,
+} from "../application/run-transcription-job-use-case.js";
 import { type JobStore } from "../domain/ports/job-store.js";
 import { type MediaSegmenter } from "../domain/ports/media-segmenter.js";
 import { bindTranscriber, type TranscriberBinding } from "../domain/ports/transcriber-binding.js";
@@ -37,6 +37,10 @@ export interface InputPathResolverLike {
   resolve(inputPath: string): string;
 }
 
+export interface RunTranscriptionJobExecutor {
+  execute(input: RunTranscriptionJobUseCaseInput): Promise<RunTranscriptionJobUseCaseResult>;
+}
+
 export interface TranscriptionCliApplicationServices {
   argumentParser?: CliArgumentParserLike;
   inputPathResolver?: InputPathResolverLike;
@@ -44,7 +48,7 @@ export interface TranscriptionCliApplicationServices {
     dependencies: DefaultTranscriberBindingFactoryDependencies,
   ) => TranscriberBindingFactory;
   loadEnvFile?: typeof loadEnvFile;
-  runTranscriptionJob?: (input: RunTranscriptionJobInput) => Promise<RunTranscriptionJobResult>;
+  runTranscriptionJobUseCase?: RunTranscriptionJobExecutor;
   writeStdout?: (text: string) => void;
 }
 
@@ -55,7 +59,7 @@ export class TranscriptionCliApplication {
     dependencies: DefaultTranscriberBindingFactoryDependencies,
   ) => TranscriberBindingFactory;
   private readonly loadEnvFileFn: typeof loadEnvFile;
-  private readonly runTranscriptionJobFn: (input: RunTranscriptionJobInput) => Promise<RunTranscriptionJobResult>;
+  private readonly runTranscriptionJobUseCase: RunTranscriptionJobExecutor;
   private readonly writeStdout: (text: string) => void;
 
   public constructor(
@@ -67,7 +71,7 @@ export class TranscriptionCliApplication {
     this.createDefaultTranscriberBindingFactory = services.createDefaultTranscriberBindingFactory
       ?? ((factoryDependencies) => new DefaultTranscriberBindingFactory(factoryDependencies));
     this.loadEnvFileFn = services.loadEnvFile ?? loadEnvFile;
-    this.runTranscriptionJobFn = services.runTranscriptionJob ?? runTranscriptionJob;
+    this.runTranscriptionJobUseCase = services.runTranscriptionJobUseCase ?? new RunTranscriptionJobUseCase();
     this.writeStdout = services.writeStdout ?? ((text) => {
       process.stdout.write(text);
     });
@@ -94,7 +98,7 @@ export class TranscriptionCliApplication {
       const mediaSegmenter = this.dependencies.createMediaSegmenter?.()
         ?? new FFmpegMediaSegmenter();
       const transcriberBinding = this.resolveTranscriberBinding(normalizedOptions, env);
-      const result = await this.runTranscriptionJobFn({
+      const result = await this.runTranscriptionJobUseCase.execute({
         ...normalizedOptions,
         jobStore,
         mediaSegmenter,
@@ -133,7 +137,7 @@ export class TranscriptionCliApplication {
     }).create(options);
   }
 
-  private logResult(logger: Logger, result: RunTranscriptionJobResult): void {
+  private logResult(logger: Logger, result: RunTranscriptionJobUseCaseResult): void {
     if (result.exitCode === 0) {
       logger.info("job", "Pipeline concluido com sucesso.", {
         finalMarkdownPath: result.finalMarkdownPath,

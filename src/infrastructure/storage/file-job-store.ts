@@ -1,12 +1,12 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 
 import { type ChunkManifest } from "../../domain/entities/chunk-manifest.js";
-import { Job } from "../../domain/entities/job.js";
 import {
+  Job,
   type JobCompatibilitySnapshot,
   type JobState,
   type JobStatus,
-} from "../../domain/entities/job-state.js";
+} from "../../domain/entities/job.js";
 import { type JobStore } from "../../domain/ports/job-store.js";
 import {
   FINAL_TRANSCRIPT_FILE_NAME,
@@ -101,7 +101,7 @@ export class FileJobStore implements JobStore {
   public async readJobState(): Promise<JobState> {
     await this.waitForMutations();
     const stateRecord = await this.readJobStateRecord();
-    return Job.restore(fromJobStateRecord(this.paths.rootDir, stateRecord)).toState();
+    return fromJobStateRecord(this.paths.rootDir, stateRecord);
   }
 
   public async tryReadJobState(): Promise<JobState | null> {

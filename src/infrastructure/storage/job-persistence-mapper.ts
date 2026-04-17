@@ -1,10 +1,10 @@
 import { type ChunkManifest, createChunkManifest } from "../../domain/entities/chunk-manifest.js";
+import { type ChunkState } from "../../domain/entities/job-chunk.js";
 import {
-  createInitialJobState,
-  type ChunkState,
   type JobCompatibilitySnapshot,
   type JobState,
-} from "../../domain/entities/job-state.js";
+} from "../../domain/entities/job.js";
+import { Job } from "../../domain/entities/job.js";
 import { normalizeRelativePath, resolveFromRoot } from "../../shared/paths.js";
 import { type ChunkManifestRecord, type ChunkManifestRecordEntry } from "./chunk-manifest-record.js";
 import {
@@ -136,20 +136,18 @@ export function toJobStateRecord(rootDir: string, state: JobState): JobStateReco
 }
 
 export function fromJobStateRecord(rootDir: string, record: JobStateRecord): JobState {
-  const state = createInitialJobState({
+  return Job.restore({
+    version: record.version,
     jobId: record.jobId,
     provider: record.provider,
     cleanupPolicy: record.cleanupPolicy,
     compatibility: fromJobCompatibilitySnapshotRecord(record.compatibility),
     createdAt: normalizeIsoTimestamp(record.createdAt),
-  });
-
-  state.updatedAt = normalizeIsoTimestamp(record.updatedAt);
-  state.status = record.status;
-  state.errorSummary = record.errorSummary;
-  state.manifestPath = normalizeNullablePersistedRelativePath(rootDir, record.manifestPath);
-  state.finalMarkdownPath = normalizeNullablePersistedRelativePath(rootDir, record.finalMarkdownPath);
-  state.chunks = sortByIndex(record.chunks).map((chunk) => fromJobChunkStateRecord(rootDir, chunk));
-
-  return state;
+    updatedAt: normalizeIsoTimestamp(record.updatedAt),
+    status: record.status,
+    errorSummary: record.errorSummary,
+    manifestPath: normalizeNullablePersistedRelativePath(rootDir, record.manifestPath),
+    finalMarkdownPath: normalizeNullablePersistedRelativePath(rootDir, record.finalMarkdownPath),
+    chunks: sortByIndex(record.chunks).map((chunk) => fromJobChunkStateRecord(rootDir, chunk)),
+  }).toState();
 }

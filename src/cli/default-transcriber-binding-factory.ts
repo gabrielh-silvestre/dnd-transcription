@@ -54,16 +54,6 @@ export class DefaultTranscriberBindingFactory implements TranscriberBindingFacto
     throw new Error(`Provedor '${options.provider}' nao esta implementado nesta V1.`);
   }
 
-  public createLegacyTranscriber(options: CliOptions): Transcriber {
-    const transcriber = this.create(options).createTranscriber();
-
-    if (transcriber instanceof Promise) {
-      throw new Error("createDefaultTranscriber nao suporta factories assicronas.");
-    }
-
-    return transcriber;
-  }
-
   private createConfiguredOpenAITranscriber(config: OpenAIProviderConfig): Transcriber {
     const client = this.dependencies.createOpenAIAudioClient?.(config)
       ?? new DefaultOpenAIAudioClient(config);
@@ -95,18 +85,4 @@ export class DefaultTranscriberBindingFactory implements TranscriberBindingFacto
       createTranscriber: () => new FakeTranscriber(options),
     };
   }
-}
-
-export function createDefaultTranscriberBinding(
-  options: CliOptions,
-  dependencies: DefaultTranscriberBindingFactoryDependencies = {},
-): TranscriberBinding {
-  return new DefaultTranscriberBindingFactory(dependencies).create(options);
-}
-
-export function createDefaultTranscriber(
-  options: CliOptions,
-  dependencies: DefaultTranscriberBindingFactoryDependencies = {},
-): Transcriber {
-  return new DefaultTranscriberBindingFactory(dependencies).createLegacyTranscriber(options);
 }

@@ -5,10 +5,14 @@ import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { runCli } from "../../src/cli/main.js";
-import { runTranscriptionJob } from "../../src/application/run-transcription-job.js";
+import {
+  RunTranscriptionJobUseCase,
+  type RunTranscriptionJobUseCaseInput,
+  type RunTranscriptionJobUseCaseResult,
+} from "../../src/application/run-transcription-job-use-case.js";
 import { type TranscriptionRequest, type TranscriptionResult } from "../../src/domain/entities/transcription-result.js";
 import { type MediaSegmenter, type SegmentMediaInput, type SegmentMediaResult } from "../../src/domain/ports/media-segmenter.js";
-import { type TranscriberBinding } from "../../src/domain/ports/transcriber-binding.js";
+import { bindTranscriber, type TranscriberBinding } from "../../src/domain/ports/transcriber-binding.js";
 import { createTranscriberSignature, type Transcriber } from "../../src/domain/ports/transcriber.js";
 import { FileJobStore } from "../../src/infrastructure/storage/file-job-store.js";
 import { createLogger } from "../../src/shared/logger.js";
@@ -125,6 +129,11 @@ interface PersistedJobState {
   chunks: PersistedChunkState[];
 }
 
+interface RunTranscriptionJobInput extends Omit<RunTranscriptionJobUseCaseInput, "transcriberBinding"> {
+  transcriber?: Transcriber;
+  transcriberBinding?: TranscriberBinding;
+}
+
 function createSegmenter(): StubMediaSegmenter {
   return new StubMediaSegmenter({
     totalDurationMs: 180_000,
@@ -144,6 +153,27 @@ async function createInputFixture(root: string): Promise<string> {
 
 async function readPersistedJobState(outputDir: string): Promise<PersistedJobState> {
   return JSON.parse(await readFile(join(outputDir, "job-state.json"), "utf8")) as PersistedJobState;
+}
+
+function resolveTranscriberBinding(input: Pick<RunTranscriptionJobInput, "transcriber" | "transcriberBinding">): TranscriberBinding {
+  if (input.transcriberBinding !== undefined) {
+    return input.transcriberBinding;
+  }
+
+  if (input.transcriber !== undefined) {
+    return bindTranscriber(input.transcriber);
+  }
+
+  throw new Error("RunTranscriptionJob requer `transcriber` ou `transcriberBinding`.");
+}
+
+async function runTranscriptionJob(input: RunTranscriptionJobInput): Promise<RunTranscriptionJobUseCaseResult> {
+  const { transcriber: _legacyTranscriber, transcriberBinding: _providedBinding, ...useCaseInput } = input;
+
+  return await new RunTranscriptionJobUseCase().execute({
+    ...useCaseInput,
+    transcriberBinding: resolveTranscriberBinding(input),
+  });
 }
 
 function assertIsoTimestamp(value: string | null): asserts value is string {

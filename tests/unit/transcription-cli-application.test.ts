@@ -7,7 +7,7 @@ import {
   type InputPathResolverLike,
 } from "../../src/cli/transcription-cli-application.js";
 import { type CliOptions } from "../../src/cli/cli-argument-parser.js";
-import { type RunTranscriptionJobInput } from "../../src/application/run-transcription-job.js";
+import { type RunTranscriptionJobUseCaseInput } from "../../src/application/run-transcription-job-use-case.js";
 import { type JobStore } from "../../src/domain/ports/job-store.js";
 import { type MediaSegmenter } from "../../src/domain/ports/media-segmenter.js";
 import { createTranscriberSignature, type Transcriber } from "../../src/domain/ports/transcriber.js";
@@ -59,15 +59,17 @@ test("TranscriptionCliApplication retorna help sem carregar env nem executar o j
         envLoads += 1;
         return {};
       },
-      runTranscriptionJob: async () => {
-        executions += 1;
-        return {
-          exitCode: 0,
-          jobStatus: "succeeded",
-          failedChunks: [],
-          finalMarkdownPath: null,
-          errorSummary: null,
-        };
+      runTranscriptionJobUseCase: {
+        execute: async () => {
+          executions += 1;
+          return {
+            exitCode: 0,
+            jobStatus: "succeeded",
+            failedChunks: [],
+            finalMarkdownPath: null,
+            errorSummary: null,
+          };
+        },
       },
       writeStdout: (text) => {
         stdout += text;
@@ -118,7 +120,7 @@ test("TranscriptionCliApplication preserva o seam legado createTranscriber", asy
     name: "segmenter",
   } as unknown as MediaSegmenter;
 
-  let capturedInput: RunTranscriptionJobInput | undefined;
+  let capturedInput: RunTranscriptionJobUseCaseInput | undefined;
 
   const application = new TranscriptionCliApplication(
     {
@@ -131,16 +133,18 @@ test("TranscriptionCliApplication preserva o seam legado createTranscriber", asy
       argumentParser,
       inputPathResolver,
       loadEnvFile: async () => ({}),
-      runTranscriptionJob: async (input) => {
-        capturedInput = input;
+      runTranscriptionJobUseCase: {
+        execute: async (input) => {
+          capturedInput = input;
 
-        return {
-          exitCode: 0,
-          jobStatus: "succeeded",
-          failedChunks: [],
-          finalMarkdownPath: "./tmp/job/transcript.md",
-          errorSummary: null,
-        };
+          return {
+            exitCode: 0,
+            jobStatus: "succeeded",
+            failedChunks: [],
+            finalMarkdownPath: "./tmp/job/transcript.md",
+            errorSummary: null,
+          };
+        },
       },
     },
   );

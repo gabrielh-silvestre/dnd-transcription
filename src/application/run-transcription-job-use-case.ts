@@ -4,11 +4,11 @@ import { basename, resolve } from "node:path";
 
 import { MergeTranscriptsUseCase } from "./merge-transcripts-use-case.js";
 import { type ChunkManifest, type ChunkManifestEntry } from "../domain/entities/chunk-manifest.js";
-import { Job } from "../domain/entities/job.js";
 import {
+  Job,
   type JobCompatibilitySnapshot,
   type JobState,
-} from "../domain/entities/job-state.js";
+} from "../domain/entities/job.js";
 import { type JobStore } from "../domain/ports/job-store.js";
 import { type MediaSegmenter } from "../domain/ports/media-segmenter.js";
 import { type TranscriberBinding } from "../domain/ports/transcriber-binding.js";

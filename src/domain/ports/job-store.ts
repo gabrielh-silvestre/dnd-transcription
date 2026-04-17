@@ -1,5 +1,5 @@
 import { type ChunkManifest } from "../entities/chunk-manifest.js";
-import { type JobCompatibilitySnapshot, type JobState, type JobStatus } from "../entities/job-state.js";
+import { type JobCompatibilitySnapshot, type JobState, type JobStatus } from "../entities/job.js";
 import { type CleanupPolicy, type JobPaths } from "../../shared/paths.js";
 
 export interface JobStore {

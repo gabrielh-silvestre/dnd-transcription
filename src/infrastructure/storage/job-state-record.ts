@@ -1,4 +1,5 @@
-import { type ChunkStatus, type JobStatus } from "../../domain/entities/job-state.js";
+import { type ChunkStatus } from "../../domain/entities/job-chunk.js";
+import { type JobStatus } from "../../domain/entities/job.js";
 import { type CleanupPolicy } from "../../shared/paths.js";
 
 export interface JobCompatibilitySnapshotRecord {

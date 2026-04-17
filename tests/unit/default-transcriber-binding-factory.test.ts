@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  createDefaultTranscriber,
-  createDefaultTranscriberBinding,
   DefaultTranscriberBindingFactory,
 } from "../../src/cli/default-transcriber-binding-factory.js";
 import { type CliOptions } from "../../src/cli/cli-argument-parser.js";
@@ -55,14 +53,20 @@ test("DefaultTranscriberBindingFactory adia a criacao do client OpenAI ate mater
   assert.equal(transcriber.signature, binding.signature);
 });
 
-test("createDefaultTranscriber preserva o seam legado sincronico para o provider fake", () => {
+test("DefaultTranscriberBindingFactory preserva o caminho sincrono do provider fake", () => {
   const options = createCliOptions("fake");
   const env = {
     FAKE_TRANSCRIBER_LATENCY_MS: "0",
   };
 
-  const binding = createDefaultTranscriberBinding(options, { env });
-  const transcriber = createDefaultTranscriber(options, { env });
+  const binding = new DefaultTranscriberBindingFactory({ env }).create(options);
+  const transcriber = binding.createTranscriber();
+
+  assert.equal(transcriber instanceof Promise, false);
+
+  if (transcriber instanceof Promise) {
+    throw new Error("Resultado inesperado");
+  }
 
   assert.equal(binding.signature, createFakeTranscriberSignature({ latencyMs: 0, failChunkIndexes: [] }));
   assert.ok(transcriber instanceof FakeTranscriber);

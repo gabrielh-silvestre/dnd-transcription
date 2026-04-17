@@ -161,6 +161,18 @@ npm run transcribe -- \
 - `exit code 2` indica falha parcial reaproveitavel
 - `exit code 1` indica erro fatal ou uso invalido
 
+## Arquitetura final
+
+- `src/cli/main.ts` e apenas o entrypoint Node e o wrapper programatico `runCli()`
+- `src/cli/transcription-cli-application.ts` concentra parse, help, carga de `.env`, composicao de dependencias e dispatch do caso de uso
+- `src/cli/default-transcriber-binding-factory.ts` resolve o provider default e cria `TranscriberBinding` lazy
+- `src/application/run-transcription-job-use-case.ts` orquestra bootstrap, `--resume`, transcricao paralela, merge e cleanup
+- `src/application/merge-transcripts-use-case.ts` consolida o markdown final a partir do manifesto persistido
+- `src/domain/entities/job.ts` e `src/domain/entities/job-chunk.ts` sao as fronteiras autoritativas do ciclo de vida do job
+- `src/domain/entities/chunk-manifest.ts` e o value object do manifesto persistido
+- `src/infrastructure/storage/file-job-store.ts` usa `job-persistence-mapper.ts` e records tipados para manter `manifest.json` e `job-state.json` retrocompativeis
+- `src/shared/` e parte dos adapters de provider permanecem como modulos funcionais por desenho; OO-iza-los agora nao traz ganho arquitetural claro
+
 ## Notas do provider openai-whisper
 
 - O provider desta fase e travado em `whisper-1` com `response_format: "json"`
@@ -186,9 +198,10 @@ npm run transcribe -- \
 
 ## Extensao de provedores
 
-O orquestrador depende apenas do contrato [`Transcriber`](./src/domain/ports/transcriber.ts). Para adicionar um provedor real:
+A camada de aplicacao depende de [`TranscriberBinding`](./src/domain/ports/transcriber-binding.ts), enquanto o transcriber real continua implementando [`Transcriber`](./src/domain/ports/transcriber.ts). Para adicionar um provedor real:
 
 1. implemente a interface em `src/infrastructure/providers/`
-2. conecte a selecao do provedor em [`main.ts`](./src/cli/main.ts)
-3. exponha uma `signature` estavel para a compatibilidade de `--resume`
-4. mantenha a mesma entrada estavel (`audioPath`, `chunkIndex`, `startMs`, `endMs`)
+2. conecte o binding lazy do provedor em [`default-transcriber-binding-factory.ts`](./src/cli/default-transcriber-binding-factory.ts)
+3. preserve a composicao da CLI em [`transcription-cli-application.ts`](./src/cli/transcription-cli-application.ts) sem perder as seams de `CliDependencies`
+4. exponha uma `signature` estavel para a compatibilidade de `--resume`
+5. mantenha a mesma entrada estavel (`audioPath`, `chunkIndex`, `startMs`, `endMs`)
