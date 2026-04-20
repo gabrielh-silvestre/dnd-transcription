@@ -9,6 +9,7 @@
 
 - The main OO refactor is complete: the canonical layers are `src/cli/`, `src/application/`, `src/domain/`, and `src/infrastructure/`.
 - The repo-local code wiki was bootstrapped on 2026-04-20 and should now be treated as the persistent documentation layer for the codebase.
+- The default automated test runner is now Jest over compiled artifacts in `dist/tests`.
 - `CLAUDE.md`, `AGENTS.md`, and `README.md` point to `docs/wiki/` as part of the navigation flow.
 
 ## What to read first next time
@@ -20,6 +21,10 @@
 
 ## Key commands
 
+- `npm test`
+- `npm run test:unit`
+- `npm run test:integration`
+- `npm run test:file -- dist/tests/unit/parse-args.test.js`
 - `npm run transcribe -- --input <file> --output <dir> --provider <provider>`
 - `npm run wiki -- init`
 - `npm run wiki -- ingest --source <path>`

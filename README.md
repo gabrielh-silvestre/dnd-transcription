@@ -190,11 +190,18 @@ npm run transcribe -- \
 - `AZURE_OPENAI_DEPLOYMENT` existe para cenarios em que o nome do deployment nao e igual ao nome do modelo
 - O preflight de chunk segue o mesmo limite operacional de upload usado pelo provider `openai-whisper`
 
+## Testing
+
+- `npm test`: compila o projeto e roda a suite Jest completa sobre `dist/tests`
+- `npm run test:unit`: compila e roda apenas os testes unitarios
+- `npm run test:integration`: compila e roda apenas os testes de integracao
+- `npm run test:file -- dist/tests/unit/parse-args.test.js`: compila e roda um arquivo especifico ja compilado em `dist/tests`
+- `npm run verify:long-input`: check host-dependent separado da suite padrao
+
 ## Scripts
 
 - `npm run build`
-- `npm test`
-- `npm run verify:long-input`
+- `npm run transcribe -- --input <file.mkv> --output <dir> --provider <provider>`
 - `npm run wiki -- <init|refresh|ingest|query|lint>`
 
 ## Code Wiki

@@ -14,8 +14,8 @@ npm run wiki -- <init|refresh|ingest|query|lint>
 Focused checks:
 
 ```bash
-npm run build --silent && node --test dist/tests/unit/parse-args.test.js
-npm run build --silent && node --test dist/tests/unit/wiki/*.test.js
+npm run test:file -- dist/tests/unit/parse-args.test.js
+npm run test:unit -- --testPathPatterns=dist/tests/unit/wiki/
 ```
 
 ## Wiki-first workflow

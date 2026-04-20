@@ -1,7 +1,6 @@
-import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import test from "node:test";
+import { describe, expect, it } from "@jest/globals";
 
 import OpenAI, { AzureOpenAI } from "openai";
 
@@ -15,121 +14,120 @@ import {
 } from "../../src/infrastructure/providers/openai-audio-client.js";
 import { createTempDir } from "../helpers/temp-dir.js";
 
-test("DefaultOpenAIAudioClient monta request com whisper-1 e response_format json", async (context) => {
-  const root = await createTempDir("openai-client", context);
-  const audioPath = join(root, "chunk.wav");
-  await writeFile(audioPath, "audio", "utf8");
+describe("OpenAI audio client", () => {
+  it("monta request com whisper-1 e response_format json", async () => {
+    const root = await createTempDir("openai-client");
+    const audioPath = join(root, "chunk.wav");
+    await writeFile(audioPath, "audio", "utf8");
 
-  let capturedRequest: OpenAIAudioCreateRequest | undefined;
+    let capturedRequest: OpenAIAudioCreateRequest | undefined;
 
-  const sdk: OpenAIAudioSdkLike = {
-    audio: {
-      transcriptions: {
-        create: async (request) => {
-          capturedRequest = request;
-          return { text: "texto transcrito", usage: { type: "duration", seconds: 1 } };
+    const sdk: OpenAIAudioSdkLike = {
+      audio: {
+        transcriptions: {
+          create: async (request) => {
+            capturedRequest = request;
+            return { text: "texto transcrito", usage: { type: "duration", seconds: 1 } };
+          },
         },
       },
-    },
-  };
+    };
 
-  const client = new DefaultOpenAIAudioClient(
-    {
+    const client = new DefaultOpenAIAudioClient(
+      {
+        backend: "openai",
+        apiKey: "sk-test",
+        model: "whisper-1",
+        requestModel: "whisper-1",
+        responseFormat: "json",
+        endpoint: null,
+        apiVersion: null,
+        deployment: null,
+      },
+      sdk,
+    );
+    const response = await client.transcribe({
+      audioPath,
+      language: "pt",
+      prompt: "glossario",
+    });
+
+    expect(response).toStrictEqual({ text: "texto transcrito" });
+    expect(capturedRequest?.model).toBe("whisper-1");
+    expect(capturedRequest?.response_format).toBe("json");
+    expect(capturedRequest?.language).toBe("pt");
+    expect(capturedRequest?.prompt).toBe("glossario");
+    expect((capturedRequest?.file as { path?: string }).path).toBe(audioPath);
+  });
+
+  it("normaliza erro retryable do SDK", async () => {
+    const root = await createTempDir("openai-client-error");
+    const audioPath = join(root, "chunk.wav");
+    await writeFile(audioPath, "audio", "utf8");
+
+    const sdk: OpenAIAudioSdkLike = {
+      audio: {
+        transcriptions: {
+          create: async () => {
+            throw {
+              status: 429,
+              message: "rate limited",
+            };
+          },
+        },
+      },
+    };
+
+    const client = new DefaultOpenAIAudioClient(
+      {
+        backend: "openai",
+        apiKey: "sk-test",
+        model: "whisper-1",
+        requestModel: "whisper-1",
+        responseFormat: "json",
+        endpoint: null,
+        apiVersion: null,
+        deployment: null,
+      },
+      sdk,
+    );
+
+    const transcriptionPromise = client.transcribe({ audioPath });
+
+    await expect(transcriptionPromise).rejects.toBeInstanceOf(OpenAIAudioClientError);
+    await expect(transcriptionPromise).rejects.toMatchObject({ retryable: true });
+    await expect(transcriptionPromise).rejects.toThrow(/rate limited/);
+  });
+
+  it("distingue erro retryable de permanente", () => {
+    expect(classifyOpenAIAudioError({ status: 503 })).toStrictEqual({ retryable: true });
+    expect(classifyOpenAIAudioError({ name: "APIConnectionTimeoutError" })).toStrictEqual({ retryable: true });
+    expect(classifyOpenAIAudioError({ status: 400 })).toStrictEqual({ retryable: false });
+  });
+
+  it("instancia OpenAI ou AzureOpenAI conforme o backend", () => {
+    const openaiSdk = createOpenAIAudioSdk({
       backend: "openai",
       apiKey: "sk-test",
-      model: "whisper-1",
-      requestModel: "whisper-1",
+      model: "gpt-4o-mini-transcribe",
+      requestModel: "gpt-4o-mini-transcribe",
       responseFormat: "json",
       endpoint: null,
       apiVersion: null,
       deployment: null,
-    },
-    sdk,
-  );
-  const response = await client.transcribe({
-    audioPath,
-    language: "pt",
-    prompt: "glossario",
-  });
-
-  assert.deepEqual(response, { text: "texto transcrito" });
-  assert.equal(capturedRequest?.model, "whisper-1");
-  assert.equal(capturedRequest?.response_format, "json");
-  assert.equal(capturedRequest?.language, "pt");
-  assert.equal(capturedRequest?.prompt, "glossario");
-  assert.equal((capturedRequest?.file as { path?: string }).path, audioPath);
-});
-
-test("DefaultOpenAIAudioClient normaliza erro retryable do SDK", async (context) => {
-  const root = await createTempDir("openai-client-error", context);
-  const audioPath = join(root, "chunk.wav");
-  await writeFile(audioPath, "audio", "utf8");
-
-  const sdk: OpenAIAudioSdkLike = {
-    audio: {
-      transcriptions: {
-        create: async () => {
-          throw {
-            status: 429,
-            message: "rate limited",
-          };
-        },
-      },
-    },
-  };
-
-  const client = new DefaultOpenAIAudioClient(
-    {
-      backend: "openai",
-      apiKey: "sk-test",
-      model: "whisper-1",
-      requestModel: "whisper-1",
+    });
+    const azureSdk = createOpenAIAudioSdk({
+      backend: "azure",
+      apiKey: "azure-key",
+      model: "gpt-4o-transcribe",
+      requestModel: "transcribe-prod",
       responseFormat: "json",
-      endpoint: null,
-      apiVersion: null,
-      deployment: null,
-    },
-    sdk,
-  );
+      endpoint: "https://example-resource.azure.openai.com",
+      apiVersion: "2025-03-01-preview",
+      deployment: "transcribe-prod",
+    });
 
-  await assert.rejects(async () => {
-    await client.transcribe({ audioPath });
-  }, (error: unknown) => {
-    assert.equal(error instanceof OpenAIAudioClientError, true);
-    assert.equal((error as OpenAIAudioClientError).retryable, true);
-    assert.match((error as Error).message, /rate limited/);
-    return true;
+    expect(openaiSdk).toBeInstanceOf(OpenAI);
+    expect(azureSdk).toBeInstanceOf(AzureOpenAI);
   });
-});
-
-test("classifyOpenAIAudioError distingue erro retryable de permanente", () => {
-  assert.deepEqual(classifyOpenAIAudioError({ status: 503 }), { retryable: true });
-  assert.deepEqual(classifyOpenAIAudioError({ name: "APIConnectionTimeoutError" }), { retryable: true });
-  assert.deepEqual(classifyOpenAIAudioError({ status: 400 }), { retryable: false });
-});
-
-test("createOpenAIAudioSdk instancia OpenAI ou AzureOpenAI conforme o backend", () => {
-  const openaiSdk = createOpenAIAudioSdk({
-    backend: "openai",
-    apiKey: "sk-test",
-    model: "gpt-4o-mini-transcribe",
-    requestModel: "gpt-4o-mini-transcribe",
-    responseFormat: "json",
-    endpoint: null,
-    apiVersion: null,
-    deployment: null,
-  });
-  const azureSdk = createOpenAIAudioSdk({
-    backend: "azure",
-    apiKey: "azure-key",
-    model: "gpt-4o-transcribe",
-    requestModel: "transcribe-prod",
-    responseFormat: "json",
-    endpoint: "https://example-resource.azure.openai.com",
-    apiVersion: "2025-03-01-preview",
-    deployment: "transcribe-prod",
-  });
-
-  assert.equal(openaiSdk instanceof OpenAI, true);
-  assert.equal(azureSdk instanceof AzureOpenAI, true);
 });

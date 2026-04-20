@@ -93,7 +93,7 @@ export async function loadEnvFile(input: {
 
     return env;
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
       return env;
     }
 

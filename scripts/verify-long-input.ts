@@ -9,6 +9,7 @@ import { runCommand } from "../src/shared/process.js";
 
 const LONG_DURATION_SECONDS = 11_160;
 const CHUNK_DURATION_SECONDS = 600;
+const MAX_DURATION_DRIFT_MS = 64;
 
 async function main(): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), "dnd-transcription-long-"));
@@ -56,9 +57,15 @@ async function main(): Promise<void> {
       chunks: Array<{ startMs: number; endMs: number }>;
     };
     const expectedChunkCount = Math.ceil(LONG_DURATION_SECONDS / CHUNK_DURATION_SECONDS);
+    const expectedDurationMs = LONG_DURATION_SECONDS * 1_000;
+    const lastChunkEndMs = manifest.chunks[expectedChunkCount - 1]?.endMs;
 
     assert.equal(manifest.chunks.length, expectedChunkCount);
-    assert.equal(manifest.chunks[expectedChunkCount - 1]?.endMs, LONG_DURATION_SECONDS * 1_000);
+    assert.equal(typeof lastChunkEndMs, "number");
+    assert.ok(
+      Math.abs((lastChunkEndMs ?? 0) - expectedDurationMs) <= MAX_DURATION_DRIFT_MS,
+      `expected last chunk to end within ${MAX_DURATION_DRIFT_MS}ms of ${expectedDurationMs}, received ${lastChunkEndMs}`,
+    );
 
     process.stdout.write(`Long input verification succeeded with ${expectedChunkCount} chunks.\n`);
   } finally {

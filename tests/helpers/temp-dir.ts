@@ -1,14 +1,23 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type TestContext } from "node:test";
 
-export async function createTempDir(prefix: string, context?: TestContext): Promise<string> {
+const tempDirectories = new Set<string>();
+
+export async function createTempDir(prefix: string): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), `${prefix}-`));
-
-  context?.after(async () => {
-    await rm(directory, { recursive: true, force: true });
-  });
+  tempDirectories.add(directory);
 
   return directory;
+}
+
+export async function cleanupTempDirs(): Promise<void> {
+  const directories = Array.from(tempDirectories);
+  tempDirectories.clear();
+
+  await Promise.all(
+    directories.map(async (directory) => {
+      await rm(directory, { recursive: true, force: true });
+    }),
+  );
 }

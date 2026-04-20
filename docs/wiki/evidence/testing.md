@@ -13,7 +13,7 @@ This file is deterministic evidence for the repository's testing posture.
 
 ## Current shape
 
-- test files: 22
+- test files: 23
 
 ## Main test layers
 
@@ -37,6 +37,7 @@ This file is deterministic evidence for the repository's testing posture.
 - `tests/integration/openai-transcription-cli.test.ts`
 - `tests/integration/openai-whisper-cli.test.ts`
 - `tests/integration/transcription-orchestrator.test.ts`
+- `tests/setup/jest.setup.ts`
 - `tests/unit/chunk-manifest.test.ts`
 - `tests/unit/default-transcriber-binding-factory.test.ts`
 - `tests/unit/env-file.test.ts`

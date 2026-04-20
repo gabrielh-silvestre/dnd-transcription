@@ -55,7 +55,7 @@ OMX v2 is Codex-native. Do not reintroduce `claude_code*` tools or the old Codex
 ## Project commands
 
 - `npm run build` compiles TypeScript to `dist/` and clears stale artifacts before `tsc`
-- `npm test` runs the build plus the full suite on `dist/tests`
+- `npm test` runs the build plus the full Jest suite on `dist/tests`
 - `npm run transcribe -- --input <file> --output <dir> --provider <fake|openai-whisper|openai-transcription>` runs the real transcription CLI
 - `npm run wiki -- <init|refresh|ingest|query|lint>` maintains the repo-local code wiki in `docs/wiki/`
 

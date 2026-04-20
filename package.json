@@ -5,13 +5,18 @@
   "type": "module",
   "scripts": {
     "build": "node --input-type=module --eval \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.json",
-    "test": "npm run build --silent && node --test dist/tests",
+    "jest:run": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.config.cjs --runInBand",
+    "test": "npm run build --silent && npm run jest:run",
+    "test:unit": "npm run build --silent && npm run jest:run -- --testPathPatterns=dist/tests/unit/",
+    "test:integration": "npm run build --silent && npm run jest:run -- --testPathPatterns=dist/tests/integration/",
+    "test:file": "npm run build --silent && npm run jest:run -- --runTestsByPath",
     "verify:long-input": "npm run build --silent && node dist/scripts/verify-long-input.js",
     "transcribe": "npm run build --silent && node dist/src/cli/main.js",
     "wiki": "npm run build --silent && node dist/src/wiki/cli/main.js"
   },
   "devDependencies": {
     "@types/node": "^20.17.30",
+    "jest": "^30.3.0",
     "typescript": "^5.8.3"
   },
   "dependencies": {

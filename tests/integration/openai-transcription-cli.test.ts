@@ -1,7 +1,6 @@
-import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import test from "node:test";
+import { describe, expect, it } from "@jest/globals";
 
 import { runCli } from "../../src/cli/main.js";
 import { type OpenAITranscriptionConfig } from "../../src/infrastructure/providers/openai-transcription-config.js";
@@ -37,199 +36,202 @@ function extractChunkNumber(audioPath: string): number {
   return Number(match[1]);
 }
 
-test("CLI conecta --provider openai-transcription com backend openai", async (context) => {
-  const root = await createTempDir("openai-transcription-openai", context);
-  const outputDir = join(root, "job");
-  const inputPath = await createInputFixture(root);
-  const capturedConfigs: OpenAITranscriptionConfig[] = [];
+describe("OpenAI transcription CLI", () => {
+  describe("runCli integration", () => {
+    it("conecta --provider openai-transcription com backend openai", async () => {
+      const root = await createTempDir("openai-transcription-openai");
+      const outputDir = join(root, "job");
+      const inputPath = await createInputFixture(root);
+      const capturedConfigs: OpenAITranscriptionConfig[] = [];
 
-  const exitCode = await runCli(
-    [
-      "--input",
-      inputPath,
-      "--output",
-      outputDir,
-      "--chunk-duration-seconds",
-      "60",
-      "--concurrency",
-      "2",
-      "--provider",
-      "openai-transcription",
-      "--cleanup-policy",
-      "keep",
-    ],
-    {
-      env: {
-        OPENAI_API_KEY: "sk-test",
-        OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-mini-transcribe",
-        OPENAI_TRANSCRIPTION_LANGUAGE: "pt",
-        OPENAI_TRANSCRIPTION_PROMPT: "glossario",
-      },
-      createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-      createMediaSegmenter: () => createSegmenter(),
-      createOpenAIAudioClient: (config) => {
-        capturedConfigs.push(config as OpenAITranscriptionConfig);
-
-        return {
-          transcribe: async ({ audioPath, language, prompt }) => {
-            assert.equal(language, "pt");
-            assert.equal(prompt, "glossario");
-            return { text: `Texto do chunk ${extractChunkNumber(audioPath)}` };
+      const exitCode = await runCli(
+        [
+          "--input",
+          inputPath,
+          "--output",
+          outputDir,
+          "--chunk-duration-seconds",
+          "60",
+          "--concurrency",
+          "2",
+          "--provider",
+          "openai-transcription",
+          "--cleanup-policy",
+          "keep",
+        ],
+        {
+          env: {
+            OPENAI_API_KEY: "sk-test",
+            OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-mini-transcribe",
+            OPENAI_TRANSCRIPTION_LANGUAGE: "pt",
+            OPENAI_TRANSCRIPTION_PROMPT: "glossario",
           },
+          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
+          createMediaSegmenter: () => createSegmenter(),
+          createOpenAIAudioClient: (config) => {
+            capturedConfigs.push(config as OpenAITranscriptionConfig);
+
+            return {
+              transcribe: async ({ audioPath, language, prompt }) => {
+                expect(language).toBe("pt");
+                expect(prompt).toBe("glossario");
+                return { text: `Texto do chunk ${extractChunkNumber(audioPath)}` };
+              },
+            };
+          },
+        },
+      );
+
+      expect(exitCode).toBe(0);
+      expect(capturedConfigs.length).toBe(1);
+      expect(capturedConfigs[0]?.backend).toBe("openai");
+      expect(capturedConfigs[0]?.model).toBe("gpt-4o-mini-transcribe");
+      expect(capturedConfigs[0]?.requestModel).toBe("gpt-4o-mini-transcribe");
+      expect(capturedConfigs[0]?.responseFormat).toBe("json");
+
+      const state = JSON.parse(await readFile(join(outputDir, "job-state.json"), "utf8")) as {
+        provider: string;
+        compatibility: {
+          provider: string;
+          transcriberSignature: string;
         };
-      },
-    },
-  );
+      };
 
-  assert.equal(exitCode, 0);
-  assert.equal(capturedConfigs.length, 1);
-  assert.equal(capturedConfigs[0]?.backend, "openai");
-  assert.equal(capturedConfigs[0]?.model, "gpt-4o-mini-transcribe");
-  assert.equal(capturedConfigs[0]?.requestModel, "gpt-4o-mini-transcribe");
-  assert.equal(capturedConfigs[0]?.responseFormat, "json");
+      expect(state.provider).toBe("openai-transcription");
+      expect(state.compatibility.provider).toBe("openai-transcription");
+      expect(state.compatibility.transcriberSignature).toBe(capturedConfigs[0]?.transcriberSignature);
+    });
 
-  const state = JSON.parse(await readFile(join(outputDir, "job-state.json"), "utf8")) as {
-    provider: string;
-    compatibility: {
-      provider: string;
-      transcriberSignature: string;
-    };
-  };
+    it("conecta --provider openai-transcription com backend azure", async () => {
+      const root = await createTempDir("openai-transcription-azure");
+      const outputDir = join(root, "job");
+      const inputPath = await createInputFixture(root);
+      let capturedConfig: OpenAITranscriptionConfig | undefined;
 
-  assert.equal(state.provider, "openai-transcription");
-  assert.equal(state.compatibility.provider, "openai-transcription");
-  assert.equal(state.compatibility.transcriberSignature, capturedConfigs[0]?.transcriberSignature);
-});
+      const exitCode = await runCli(
+        [
+          "--input",
+          inputPath,
+          "--output",
+          outputDir,
+          "--chunk-duration-seconds",
+          "60",
+          "--concurrency",
+          "2",
+          "--provider",
+          "openai-transcription",
+          "--cleanup-policy",
+          "keep",
+        ],
+        {
+          env: {
+            OPENAI_TRANSCRIPTION_BACKEND: "azure",
+            OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-transcribe",
+            AZURE_OPENAI_API_KEY: "azure-key",
+            AZURE_OPENAI_ENDPOINT: "https://example-resource.azure.openai.com/",
+            OPENAI_API_VERSION: "2025-03-01-preview",
+            AZURE_OPENAI_DEPLOYMENT: "transcribe-prod",
+          },
+          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
+          createMediaSegmenter: () => createSegmenter(),
+          createOpenAIAudioClient: (config) => {
+            capturedConfig = config as OpenAITranscriptionConfig;
 
-test("CLI conecta --provider openai-transcription com backend azure", async (context) => {
-  const root = await createTempDir("openai-transcription-azure", context);
-  const outputDir = join(root, "job");
-  const inputPath = await createInputFixture(root);
-  let capturedConfig: OpenAITranscriptionConfig | undefined;
+            return {
+              transcribe: async ({ audioPath }) => ({
+                text: `Texto do chunk ${extractChunkNumber(audioPath)}`,
+              }),
+            };
+          },
+        },
+      );
 
-  const exitCode = await runCli(
-    [
-      "--input",
-      inputPath,
-      "--output",
-      outputDir,
-      "--chunk-duration-seconds",
-      "60",
-      "--concurrency",
-      "2",
-      "--provider",
-      "openai-transcription",
-      "--cleanup-policy",
-      "keep",
-    ],
-    {
-      env: {
-        OPENAI_TRANSCRIPTION_BACKEND: "azure",
-        OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-transcribe",
-        AZURE_OPENAI_API_KEY: "azure-key",
-        AZURE_OPENAI_ENDPOINT: "https://example-resource.azure.openai.com/",
-        OPENAI_API_VERSION: "2025-03-01-preview",
-        AZURE_OPENAI_DEPLOYMENT: "transcribe-prod",
-      },
-      createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-      createMediaSegmenter: () => createSegmenter(),
-      createOpenAIAudioClient: (config) => {
-        capturedConfig = config as OpenAITranscriptionConfig;
+      expect(exitCode).toBe(0);
+      expect(capturedConfig?.backend).toBe("azure");
+      expect(capturedConfig?.endpoint).toBe("https://example-resource.azure.openai.com");
+      expect(capturedConfig?.apiVersion).toBe("2025-03-01-preview");
+      expect(capturedConfig?.deployment).toBe("transcribe-prod");
+      expect(capturedConfig?.requestModel).toBe("transcribe-prod");
+    });
+    it("rejeita --resume quando backend ou deployment mudam", async () => {
+      const root = await createTempDir("openai-transcription-drift");
+      const outputDir = join(root, "job");
+      const inputPath = await createInputFixture(root);
+      let transcribeCalls = 0;
 
-        return {
-          transcribe: async ({ audioPath }) => ({
-            text: `Texto do chunk ${extractChunkNumber(audioPath)}`,
+      const firstRun = await runCli(
+        [
+          "--input",
+          inputPath,
+          "--output",
+          outputDir,
+          "--chunk-duration-seconds",
+          "60",
+          "--concurrency",
+          "2",
+          "--provider",
+          "openai-transcription",
+          "--cleanup-policy",
+          "keep",
+        ],
+        {
+          env: {
+            OPENAI_API_KEY: "sk-test",
+            OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-mini-transcribe",
+          },
+          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
+          createMediaSegmenter: () => createSegmenter(),
+          createOpenAIAudioClient: () => ({
+            transcribe: async ({ audioPath }) => {
+              transcribeCalls += 1;
+              return { text: `Texto do chunk ${extractChunkNumber(audioPath)}` };
+            },
           }),
-        };
-      },
-    },
-  );
-
-  assert.equal(exitCode, 0);
-  assert.equal(capturedConfig?.backend, "azure");
-  assert.equal(capturedConfig?.endpoint, "https://example-resource.azure.openai.com");
-  assert.equal(capturedConfig?.apiVersion, "2025-03-01-preview");
-  assert.equal(capturedConfig?.deployment, "transcribe-prod");
-  assert.equal(capturedConfig?.requestModel, "transcribe-prod");
-});
-
-test("openai-transcription rejeita --resume quando backend ou deployment mudam", async (context) => {
-  const root = await createTempDir("openai-transcription-drift", context);
-  const outputDir = join(root, "job");
-  const inputPath = await createInputFixture(root);
-  let transcribeCalls = 0;
-
-  const firstRun = await runCli(
-    [
-      "--input",
-      inputPath,
-      "--output",
-      outputDir,
-      "--chunk-duration-seconds",
-      "60",
-      "--concurrency",
-      "2",
-      "--provider",
-      "openai-transcription",
-      "--cleanup-policy",
-      "keep",
-    ],
-    {
-      env: {
-        OPENAI_API_KEY: "sk-test",
-        OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-mini-transcribe",
-      },
-      createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-      createMediaSegmenter: () => createSegmenter(),
-      createOpenAIAudioClient: () => ({
-        transcribe: async ({ audioPath }) => {
-          transcribeCalls += 1;
-          return { text: `Texto do chunk ${extractChunkNumber(audioPath)}` };
         },
-      }),
-    },
-  );
+      );
 
-  assert.equal(firstRun, 0);
+      expect(firstRun).toBe(0);
 
-  transcribeCalls = 0;
+      transcribeCalls = 0;
 
-  const resumedRun = await runCli(
-    [
-      "--input",
-      inputPath,
-      "--output",
-      outputDir,
-      "--chunk-duration-seconds",
-      "60",
-      "--concurrency",
-      "2",
-      "--provider",
-      "openai-transcription",
-      "--cleanup-policy",
-      "keep",
-      "--resume",
-    ],
-    {
-      env: {
-        OPENAI_TRANSCRIPTION_BACKEND: "azure",
-        OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-mini-transcribe",
-        AZURE_OPENAI_API_KEY: "azure-key",
-        AZURE_OPENAI_ENDPOINT: "https://example-resource.azure.openai.com",
-        OPENAI_API_VERSION: "2025-03-01-preview",
-        AZURE_OPENAI_DEPLOYMENT: "transcribe-prod",
-      },
-      createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-      createMediaSegmenter: () => createSegmenter(),
-      createOpenAIAudioClient: () => ({
-        transcribe: async ({ audioPath }) => {
-          transcribeCalls += 1;
-          return { text: `Texto do chunk ${extractChunkNumber(audioPath)}` };
+      const resumedRun = await runCli(
+        [
+          "--input",
+          inputPath,
+          "--output",
+          outputDir,
+          "--chunk-duration-seconds",
+          "60",
+          "--concurrency",
+          "2",
+          "--provider",
+          "openai-transcription",
+          "--cleanup-policy",
+          "keep",
+          "--resume",
+        ],
+        {
+          env: {
+            OPENAI_TRANSCRIPTION_BACKEND: "azure",
+            OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-mini-transcribe",
+            AZURE_OPENAI_API_KEY: "azure-key",
+            AZURE_OPENAI_ENDPOINT: "https://example-resource.azure.openai.com",
+            OPENAI_API_VERSION: "2025-03-01-preview",
+            AZURE_OPENAI_DEPLOYMENT: "transcribe-prod",
+          },
+          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
+          createMediaSegmenter: () => createSegmenter(),
+          createOpenAIAudioClient: () => ({
+            transcribe: async ({ audioPath }) => {
+              transcribeCalls += 1;
+              return { text: `Texto do chunk ${extractChunkNumber(audioPath)}` };
+            },
+          }),
         },
-      }),
-    },
-  );
+      );
 
-  assert.equal(resumedRun, 1);
-  assert.equal(transcribeCalls, 0);
+      expect(resumedRun).toBe(1);
+      expect(transcribeCalls).toBe(0);
+    });
+  });
 });

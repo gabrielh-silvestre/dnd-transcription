@@ -31,7 +31,8 @@ This page summarizes how the repository tests the pipeline, what contracts the s
 
 ## How It Works
 
-- The default suite is compiled-code-first. `npm test` runs `npm run build --silent` and then executes `node --test dist/tests`, so the test path validates both TypeScript compilation and runtime behavior from built artifacts.
+- The default suite is compiled-code-first. `npm test` runs `npm run build --silent` and then executes Jest against `dist/tests/**/*.test.js`, so the test path validates both TypeScript compilation and runtime behavior from built artifacts.
+- Focused runs keep the same built-artifact model. `npm run test:unit`, `npm run test:integration`, and `npm run test:file -- <dist/tests/...>` all reuse the compiled `dist/tests` tree instead of introducing runtime transpilation.
 - Unit tests protect the rule-heavy seams: CLI help and dependency injection, job and chunk state machines, provider config normalization, upload-limit preflight, task-pool concurrency, env-file parsing, and the wiki service itself.
 - Integration tests cover the I/O-heavy boundaries: transcription orchestration, file-store round trips, FFmpeg segmentation, OpenAI-backed CLI wiring, resume behavior, and ordered final-merge output.
 - The suite treats persistence compatibility as a first-class contract. Tests explicitly assert the persisted `manifest.json` and `job-state.json` shape, the stability of exit codes `0`, `1`, and `2`, and the behavior of resume reconciliation.

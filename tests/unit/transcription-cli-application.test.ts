@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { describe, expect, it } from "@jest/globals";
 
 import {
   TranscriptionCliApplication,
@@ -35,129 +34,131 @@ function createSilentLogger(): Logger {
   };
 }
 
-test("TranscriptionCliApplication retorna help sem carregar env nem executar o job", async () => {
-  let envLoads = 0;
-  let executions = 0;
-  let stdout = "";
+describe("Transcription CLI application", () => {
+  it("retorna help sem carregar env nem executar o job", async () => {
+    let envLoads = 0;
+    let executions = 0;
+    let stdout = "";
 
-  const argumentParser: CliArgumentParserLike = {
-    parse() {
-      return {
-        kind: "help",
-        text: "uso de teste",
-      };
-    },
-  };
-
-  const application = new TranscriptionCliApplication(
-    {
-      createLogger: createSilentLogger,
-    },
-    {
-      argumentParser,
-      loadEnvFile: async () => {
-        envLoads += 1;
-        return {};
+    const argumentParser: CliArgumentParserLike = {
+      parse() {
+        return {
+          kind: "help",
+          text: "uso de teste",
+        };
       },
-      runTranscriptionJobUseCase: {
-        execute: async () => {
-          executions += 1;
-          return {
-            exitCode: 0,
-            jobStatus: "succeeded",
-            failedChunks: [],
-            finalMarkdownPath: null,
-            errorSummary: null,
-          };
+    };
+
+    const application = new TranscriptionCliApplication(
+      {
+        createLogger: createSilentLogger,
+      },
+      {
+        argumentParser,
+        loadEnvFile: async () => {
+          envLoads += 1;
+          return {};
+        },
+        runTranscriptionJobUseCase: {
+          execute: async () => {
+            executions += 1;
+            return {
+              exitCode: 0,
+              jobStatus: "succeeded",
+              failedChunks: [],
+              finalMarkdownPath: null,
+              errorSummary: null,
+            };
+          },
+        },
+        writeStdout: (text) => {
+          stdout += text;
         },
       },
-      writeStdout: (text) => {
-        stdout += text;
+    );
+
+    const exitCode = await application.run(["--help"]);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("uso de teste");
+    expect(envLoads).toBe(0);
+    expect(executions).toBe(0);
+  });
+
+  it("preserva o seam legado createTranscriber", async () => {
+    const options = createCliOptions();
+    const inputPathResolver: InputPathResolverLike = {
+      resolve() {
+        return "/normalized/input.mkv";
       },
-    },
-  );
+    };
+    const argumentParser: CliArgumentParserLike = {
+      parse() {
+        return {
+          kind: "run",
+          options,
+        };
+      },
+    };
+    const transcriber: Transcriber = {
+      name: "legacy-fake",
+      signature: createTranscriberSignature({
+        provider: "fake",
+        variant: "legacy-seam",
+      }),
+      async transcribe() {
+        return {
+          chunkIndex: 1,
+          markdown: "noop",
+        };
+      },
+    };
+    const jobStore = {
+      paths: resolveJobPaths("./tmp/job"),
+    } as unknown as JobStore;
+    const mediaSegmenter = {
+      name: "segmenter",
+    } as unknown as MediaSegmenter;
 
-  const exitCode = await application.run(["--help"]);
+    let capturedInput: RunTranscriptionJobUseCaseInput | undefined;
 
-  assert.equal(exitCode, 0);
-  assert.equal(stdout, "uso de teste");
-  assert.equal(envLoads, 0);
-  assert.equal(executions, 0);
-});
+    const application = new TranscriptionCliApplication(
+      {
+        createLogger: createSilentLogger,
+        createJobStore: () => jobStore,
+        createMediaSegmenter: () => mediaSegmenter,
+        createTranscriber: () => transcriber,
+      },
+      {
+        argumentParser,
+        inputPathResolver,
+        loadEnvFile: async () => ({}),
+        runTranscriptionJobUseCase: {
+          execute: async (input) => {
+            capturedInput = input;
 
-test("TranscriptionCliApplication preserva o seam legado createTranscriber", async () => {
-  const options = createCliOptions();
-  const inputPathResolver: InputPathResolverLike = {
-    resolve() {
-      return "/normalized/input.mkv";
-    },
-  };
-  const argumentParser: CliArgumentParserLike = {
-    parse() {
-      return {
-        kind: "run",
-        options,
-      };
-    },
-  };
-  const transcriber: Transcriber = {
-    name: "legacy-fake",
-    signature: createTranscriberSignature({
-      provider: "fake",
-      variant: "legacy-seam",
-    }),
-    async transcribe() {
-      return {
-        chunkIndex: 1,
-        markdown: "noop",
-      };
-    },
-  };
-  const jobStore = {
-    paths: resolveJobPaths("./tmp/job"),
-  } as unknown as JobStore;
-  const mediaSegmenter = {
-    name: "segmenter",
-  } as unknown as MediaSegmenter;
-
-  let capturedInput: RunTranscriptionJobUseCaseInput | undefined;
-
-  const application = new TranscriptionCliApplication(
-    {
-      createLogger: createSilentLogger,
-      createJobStore: () => jobStore,
-      createMediaSegmenter: () => mediaSegmenter,
-      createTranscriber: () => transcriber,
-    },
-    {
-      argumentParser,
-      inputPathResolver,
-      loadEnvFile: async () => ({}),
-      runTranscriptionJobUseCase: {
-        execute: async (input) => {
-          capturedInput = input;
-
-          return {
-            exitCode: 0,
-            jobStatus: "succeeded",
-            failedChunks: [],
-            finalMarkdownPath: "./tmp/job/transcript.md",
-            errorSummary: null,
-          };
+            return {
+              exitCode: 0,
+              jobStatus: "succeeded",
+              failedChunks: [],
+              finalMarkdownPath: "./tmp/job/transcript.md",
+              errorSummary: null,
+            };
+          },
         },
       },
-    },
-  );
+    );
 
-  const exitCode = await application.run([]);
+    const exitCode = await application.run([]);
 
-  assert.equal(exitCode, 0);
-  assert.equal(capturedInput?.inputPath, "/normalized/input.mkv");
-  assert.equal(capturedInput?.jobStore, jobStore);
-  assert.equal(capturedInput?.mediaSegmenter, mediaSegmenter);
-  assert.equal(capturedInput?.transcriberBinding?.signature, transcriber.signature);
+    expect(exitCode).toBe(0);
+    expect(capturedInput?.inputPath).toBe("/normalized/input.mkv");
+    expect(capturedInput?.jobStore).toBe(jobStore);
+    expect(capturedInput?.mediaSegmenter).toBe(mediaSegmenter);
+    expect(capturedInput?.transcriberBinding?.signature).toBe(transcriber.signature);
 
-  const boundTranscriber = capturedInput?.transcriberBinding?.createTranscriber();
-  assert.equal(boundTranscriber instanceof Promise, false);
-  assert.equal(boundTranscriber, transcriber);
+    const boundTranscriber = capturedInput?.transcriberBinding?.createTranscriber();
+    expect(boundTranscriber instanceof Promise).toBe(false);
+    expect(boundTranscriber).toBe(transcriber);
+  });
 });

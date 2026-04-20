@@ -13,6 +13,9 @@ Append-only record of code wiki maintenance operations.
 - unindexed pages: 0
 - orphan pages: 0
 - broken links: 0
+## [2026-04-20] refine | testing strategy after jest migration
+
+- Updated: `pages/testing-strategy.md`
 ## [2026-04-20] refresh | Code Wiki Refresh
 
 - Pages refreshed: `schema.md`, `refinement-playbook.md`, `evidence/overview.md`, `evidence/architecture.md`, `evidence/modules/cli.md`, `evidence/modules/application.md`, `evidence/modules/domain.md`, `evidence/modules/infrastructure.md`, `evidence/modules/providers.md`, `evidence/workflows/transcription-job.md`, `evidence/workflows/resume-semantics.md`, `evidence/testing.md`, `index.md`, `evidence/index.md`, `pages/index.md`
@@ -49,6 +52,27 @@ Append-only record of code wiki maintenance operations.
 - unindexed pages: 0
 - orphan pages: 0
 - broken links: 0
+## [2026-04-20] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-04-20] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-04-20] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-04-20] refresh | Code Wiki Refresh
+
+- Pages refreshed: `schema.md`, `refinement-playbook.md`, `evidence/overview.md`, `evidence/architecture.md`, `evidence/modules/cli.md`, `evidence/modules/application.md`, `evidence/modules/domain.md`, `evidence/modules/infrastructure.md`, `evidence/modules/providers.md`, `evidence/workflows/transcription-job.md`, `evidence/workflows/resume-semantics.md`, `evidence/testing.md`, `index.md`, `evidence/index.md`
 ## [2026-04-20] lint | Code Wiki Health Check
 
 - missing required pages: 0
