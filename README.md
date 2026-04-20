@@ -195,6 +195,26 @@ npm run transcribe -- \
 - `npm run build`
 - `npm test`
 - `npm run verify:long-input`
+- `npm run wiki -- <init|refresh|ingest|query|lint>`
+
+## Code Wiki
+
+O repositorio agora inclui um wiki repo-local em `docs/wiki/` para **documentar o codigo** e nao o conteudo gerado pelas transcricoes.
+
+- `docs/wiki/schema.md` define o contrato de manutencao do wiki
+- `docs/wiki/index.md` e o catalogo principal de paginas
+- `docs/wiki/log.md` registra init, ingest, refresh e lint em ordem cronologica
+
+Fluxo recomendado:
+
+```bash
+npm run wiki -- init
+npm run wiki -- query --query "resume semantics"
+npm run wiki -- ingest --source src/cli/main.ts
+npm run wiki -- lint
+```
+
+Use `ingest` apos mudancas relevantes em `src/`, `tests/`, `README.md` ou `.omx/plans/`. Use `refresh` quando quiser regenerar o wiki inteiro a partir do estado atual do repositorio.
 
 ## Extensao de provedores
 

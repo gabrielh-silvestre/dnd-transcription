@@ -5,3 +5,5 @@ tmp/
 .omc/
 .omx/
 .ignore/raw/
+.claude/settings.local.json
+docs/wiki/reports/wiki-lint-report.md

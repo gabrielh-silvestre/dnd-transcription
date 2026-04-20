@@ -1,78 +1,74 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This repository contains a TypeScript CLI for chunking long media files, transcribing them through pluggable providers, and merging the final markdown transcript. It also contains a repo-local **code wiki** in `docs/wiki/` that should be treated as the persistent documentation layer for the codebase.
 
 ## Commands
 
 ```bash
-npm run build          # Compile TypeScript to dist/
-npm test               # Build + run all tests (Node.js native test runner)
-npm run transcribe     # Build + run the CLI
+npm run build
+npm test
+npm run transcribe -- --input <file.mkv> --output <dir> --provider <provider>
+npm run wiki -- <init|refresh|ingest|query|lint>
 ```
 
-Run a single test file:
+Focused checks:
+
 ```bash
 npm run build --silent && node --test dist/tests/unit/parse-args.test.js
+npm run build --silent && node --test dist/tests/unit/wiki/*.test.js
 ```
 
-Run the CLI directly after building:
-```bash
-node dist/src/cli/main.js --input <file.mkv> --provider openai-whisper --output <dir>
-```
+## Wiki-first workflow
 
-There is no lint step — TypeScript strict mode (`strict: true`) is the quality gate.
+- Treat `docs/wiki/` as the persistent documentation layer that sits between the agent and the raw code.
+- Treat `docs/wiki/evidence/` as deterministic raw material and `docs/wiki/pages/` as the durable refinement layer.
+- Repo-local refinement skills live in `.agents/skills/` and `.claude/skills/`.
+- Start with `docs/wiki/index.md`, `docs/wiki/schema.md`, and `docs/wiki/refinement-playbook.md` before broad exploration.
+- For cross-cutting, architectural, or history-sensitive questions, run `npm run wiki -- query --query "<terms>"` before searching `src/` or `tests/`.
+- Read `docs/wiki/pages/` first when it exists, then verify against `docs/wiki/evidence/` and raw files when editing behavior, confirming edge cases, or resolving ambiguity.
+- Never hand-edit `docs/wiki/evidence/`; regenerate it through the wiki CLI.
+- Prefer the repo-local skills `wiki-refinement-pass`, `wiki-promote-answer`, and `wiki-refinement-audit` for refinement work when available.
+- If the session produces a durable answer, comparison, or architectural note, file it into `docs/wiki/pages/` and update `docs/wiki/pages/index.md`.
+- Periodically run `npm run wiki -- lint` to keep the wiki healthy.
 
-## Architecture
+## Navigation order
 
-The project follows a **hexagonal (ports and adapters)** pattern:
+1. Read `.claude/project-context/current-state.md`.
+2. Read `.claude/project-context/architecture.md`.
+3. Read `docs/wiki/index.md`, `docs/wiki/schema.md`, and `docs/wiki/refinement-playbook.md`.
+4. Read `docs/wiki/pages/index.md` and `docs/wiki/evidence/index.md`.
+5. For broad or architectural questions, run `npm run wiki -- query --query "<terms>"`.
+6. Read raw files in `src/` and `tests/` only after the shared context or wiki is insufficient.
 
-```
-src/
-  domain/         ← pure business logic, no I/O
-    ports/        ← Transcriber, JobStore, MediaSegmenter interfaces
-    entities/     ← JobState (state machine), ChunkManifest, TranscriptionResult
-  application/    ← orchestration: run-transcription-job.ts, merge-transcripts.ts
-  infrastructure/ ← I/O adapters
-    providers/    ← FakeTranscriber, OpenAIWhisperTranscriber, OpenAIAudioTranscriber
-    storage/      ← FileJobStore (mutation queue via Promise chaining)
-    media/        ← FFmpegMediaSegmenter, ffprobe.ts
-  cli/            ← argument parsing (parse-args.ts), dependency wiring (main.ts)
-  shared/         ← paths, logger, errors, chunk-audio-format, env-file, process
-```
+## Current architecture
 
-### Key abstractions
+- `src/cli/`: entrypoint, arg parsing, input normalization, `.env` loading, dependency composition
+- `src/application/`: `RunTranscriptionJobUseCase` and `MergeTranscriptsUseCase`
+- `src/domain/`: `Job`, `JobChunk`, `ChunkManifest`, and the core ports
+- `src/infrastructure/`: filesystem persistence, ffmpeg/ffprobe media handling, concurrency, and provider adapters
+- `src/wiki/`: repo-local code wiki maintenance CLI and generators
 
-- **`Transcriber` port** (`src/domain/ports/transcriber.ts`): implement this to add a new provider; wire it up in `src/cli/main.ts`.
-- **`JobState` entity** (`src/domain/entities/job-state.ts`): enforces valid lifecycle transitions (`created → segmenting → ready → running → succeeded / partial_failed / fatal_error`). All mutations go through it.
-- **`FileJobStore`** (`src/infrastructure/storage/file-job-store.ts`): serialises concurrent writes via a mutation queue (Promise chaining) to prevent race conditions during parallel transcription.
-- **Orchestrator** (`src/application/run-transcription-job.ts`): drives the full pipeline — segment → persist manifest → dispatch chunks via `TaskPool` → merge.
+## Invariants
 
-### Resume semantics
+- `manifest.json` and `job-state.json` remain backward compatible
+- `--resume` compatibility depends on `resolvedInputPath`, `inputSizeBytes`, `inputMtimeMs`, `provider`, `transcriberSignature`, and `chunkDurationSeconds`
+- exit codes stay `0` for full success, `1` for fatal error/invalid usage, and `2` for reusable partial failure
+- all provider uploads receive WAV PCM 16-bit mono 16000 Hz audio
+- `openai-whisper` stays pinned to `whisper-1`
 
-A **compatibility snapshot** is stored with the job. On `--resume`, the snapshot is validated against the current invocation (file path/size/mtime, provider name, transcriber signature, chunk duration). Failed/orphaned chunks are downgraded to `pending` and retried; completed chunks are skipped.
+## Code wiki contract
 
-### Providers
+- The wiki documents the codebase itself, not the contents of generated transcriptions.
+- Raw sources are `src/`, `tests/`, `README.md`, `.omx/plans/`, and `.claude/project-context/`.
+- `docs/wiki/evidence/` is deterministic CLI output and must be treated as read-only evidence.
+- `docs/wiki/pages/` is the refinement layer for durable synthesis.
+- `docs/wiki/schema.md` and `docs/wiki/refinement-playbook.md` define page conventions and maintenance workflows.
+- The wiki should be consulted before broad code rediscovery and treated as the first synthesized knowledge layer for the repository.
+- After material code or architecture changes, regenerate evidence by running `npm run wiki -- ingest --source <path>` or `npm run wiki -- refresh`.
+- If an analysis or answer becomes durable project knowledge, add or update a page under `docs/wiki/pages/` and keep `docs/wiki/pages/index.md` and `docs/wiki/log.md` current.
 
-| Flag | Class | Key env vars |
-|------|-------|-------------|
-| `fake` | `FakeTranscriber` | `FAKE_TRANSCRIBER_LATENCY_MS`, `FAKE_TRANSCRIBER_FAIL_CHUNKS` |
-| `openai-whisper` | `OpenAIWhisperTranscriber` | `OPENAI_API_KEY`, `OPENAI_WHISPER_LANGUAGE`, `OPENAI_WHISPER_PROMPT` |
-| `openai-transcription` | `OpenAIAudioTranscriber` | `OPENAI_TRANSCRIPTION_MODEL`, `OPENAI_API_KEY` (or Azure variants) |
+## Testing posture
 
-API keys can be placed in a `.env` file at the project root; it is loaded via `src/shared/env-file.ts` without overwriting existing `process.env` values.
-
-### Audio format
-
-All chunks are normalised to **PCM 16-bit mono 16 kHz WAV** before being sent to any provider (defined in `src/shared/chunk-audio-format.ts`).
-
-### Exit codes
-
-| Code | Meaning |
-|------|---------|
-| `0` | All chunks succeeded |
-| `1` | Fatal error / invalid usage |
-| `2` | Partial failure — re-run with `--resume` |
-
-### Module system
-
-TypeScript is compiled to ESM (`module: NodeNext`). All local imports must include the `.js` extension (resolved to `.ts` at compile time).
+- Prefer offline tests with stubs/fakes.
+- Keep provider integrations mockable through dependency seams in the CLI and clients.
+- There is no source-code lint step; TypeScript strictness and the test suite are the quality gates, while `npm run wiki -- lint` is only for wiki health checks.

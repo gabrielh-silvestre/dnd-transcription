@@ -1,0 +1,43 @@
+---
+title: "Infrastructure Module Evidence"
+category: module
+summary: "Observed side-effect boundaries, design choices, and file inventory for infrastructure."
+source_paths:
+  - "src/infrastructure"
+  - "src/shared/process.ts"
+  - "src/shared/logger.ts"
+---
+# Infrastructure Module Evidence
+
+This file is deterministic evidence for the infrastructure layer.
+
+## Main areas
+
+- **storage**: `FileJobStore` plus typed persistence records and mappers
+- **media**: `FFmpegMediaSegmenter` and `ffprobe` wrappers
+- **concurrency**: bounded task pool for chunk execution
+- **providers**: fake/OpenAI adapters and configuration helpers
+
+## Observed design choices
+
+- `FileJobStore` serializes mutations through a queue so concurrent chunk completions do not corrupt `job-state.json`.
+- Records and mappers isolate on-disk schema from in-memory objects.
+- Media normalization happens before provider upload.
+- Provider configuration stays outside the application use case.
+
+## Relevant files
+
+- `src/infrastructure/concurrency/task-pool.ts`
+- `src/infrastructure/media/ffmpeg-media-segmenter.ts`
+- `src/infrastructure/media/ffprobe.ts`
+- `src/infrastructure/providers/fake-transcriber.ts`
+- `src/infrastructure/providers/openai-audio-client.ts`
+- `src/infrastructure/providers/openai-audio-provider-shared.ts`
+- `src/infrastructure/providers/openai-audio-transcriber.ts`
+- `src/infrastructure/providers/openai-transcription-config.ts`
+- `src/infrastructure/providers/openai-whisper-config.ts`
+- `src/infrastructure/providers/openai-whisper-transcriber.ts`
+- `src/infrastructure/storage/chunk-manifest-record.ts`
+- `src/infrastructure/storage/file-job-store.ts`
+- `src/infrastructure/storage/job-persistence-mapper.ts`
+- `src/infrastructure/storage/job-state-record.ts`
