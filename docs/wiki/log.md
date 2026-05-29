@@ -95,3 +95,6 @@ Append-only record of code wiki maintenance operations.
 - unindexed pages: 0
 - orphan pages: 0
 - broken links: 0
+## [2026-05-29] refresh | Code Wiki Refresh
+
+- Pages refreshed: `schema.md`, `refinement-playbook.md`, `evidence/overview.md`, `evidence/architecture.md`, `evidence/modules/cli.md`, `evidence/modules/application.md`, `evidence/modules/domain.md`, `evidence/modules/infrastructure.md`, `evidence/modules/providers.md`, `evidence/workflows/transcription-job.md`, `evidence/workflows/resume-semantics.md`, `evidence/testing.md`, `index.md`, `evidence/index.md`
