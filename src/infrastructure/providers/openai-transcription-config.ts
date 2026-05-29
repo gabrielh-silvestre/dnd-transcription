@@ -1,5 +1,4 @@
 import { createTranscriberSignature } from "../../domain/ports/transcriber.js";
-import { chunkAudioFormat } from "../../shared/chunk-audio-format.js";
 import { ValidationError } from "../../shared/errors.js";
 import {
   assertOpenAIAudioChunkFitsUploadLimit,
@@ -34,7 +33,6 @@ interface OpenAITranscriptionBaseConfig {
   deployment: string | null;
   transcriberSignature: string;
   uploadLimitBytes: number;
-  chunkFormat: typeof chunkAudioFormat;
 }
 
 export interface OpenAITranscriptionOpenAIConfig extends OpenAITranscriptionBaseConfig {
@@ -158,7 +156,6 @@ export function createOpenAITranscriptionConfig(
         deployment: null,
       }),
       uploadLimitBytes: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES,
-      chunkFormat: chunkAudioFormat,
     };
   }
 
@@ -196,7 +193,6 @@ export function createOpenAITranscriptionConfig(
       deployment,
     }),
     uploadLimitBytes: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES,
-    chunkFormat: chunkAudioFormat,
   };
 }
 

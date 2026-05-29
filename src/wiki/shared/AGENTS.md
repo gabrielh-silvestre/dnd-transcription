@@ -9,7 +9,7 @@ Path resolution and layout constants for the code wiki — the single definition
 ## Key Files
 | File | Description |
 |------|-------------|
-| `wiki-paths.ts` | `CodeWikiPaths` interface (rootDir, evidenceDir, evidenceModulesDir, evidenceWorkflowsDir, pagesDir, reportsDir, schemaPath, refinementPlaybookPath, indexPath, evidenceIndexPath, refinedIndexPath, logPath, lintReportPath); `resolveCodeWikiPaths(repoRoot, wikiRoot)`; path converters `toPosixPath` / `relativeToWikiRoot` / `relativeToRepoRoot`; constant `DEFAULT_CODE_WIKI_ROOT = "docs/wiki"`. |
+| `wiki-paths.ts` | `CodeWikiPaths` interface (rootDir, evidenceDir, evidenceModulesDir, evidenceWorkflowsDir, pagesDir, reportsDir, indexPath, evidenceIndexPath, refinedIndexPath, logPath, lintReportPath); `resolveCodeWikiPaths(repoRoot, wikiRoot)`; path converters `toPosixPath` / `relativeToWikiRoot` / `relativeToRepoRoot`; constant `DEFAULT_CODE_WIKI_ROOT = "docs/wiki"`. |
 
 ## For AI Agents
 

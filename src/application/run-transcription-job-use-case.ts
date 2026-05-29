@@ -222,7 +222,7 @@ export class RunTranscriptionJobUseCase {
   private async prepareResume(
     input: RunTranscriptionJobUseCaseInput,
     compatibility: JobCompatibilitySnapshot,
-  ): Promise<JobState> {
+  ): Promise<void> {
     const existingState = await input.jobStore.readJobState();
     const existingJob = Job.restore(existingState);
     await input.jobStore.readManifest();
@@ -234,10 +234,11 @@ export class RunTranscriptionJobUseCase {
     }
 
     if (existingJob.status === "succeeded") {
-      return existingJob.toState();
+      return;
     }
 
-    return await input.jobStore.reconcileForResume();
+    await input.jobStore.reconcileForResume();
+    return;
   }
 
   private collectPendingChunks(state: JobState, manifest: ChunkManifest): ChunkManifestEntry[] {

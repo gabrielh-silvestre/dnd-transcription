@@ -8,13 +8,6 @@ describe("deriveJobSubdir", () => {
     expect(deriveJobSubdir(path)).toBe(deriveJobSubdir(path));
   });
 
-  it("result depends only on the path string — calling twice yields the same value", () => {
-    const path = "/recordings/campaign/arc1.mkv";
-    const first = deriveJobSubdir(path);
-    const second = deriveJobSubdir(path);
-    expect(first).toBe(second);
-  });
-
   it("basename-collision resistance — /a/x.mkv vs /b/x.mkv produce different subdirs", () => {
     const a = deriveJobSubdir("/a/x.mkv");
     const b = deriveJobSubdir("/b/x.mkv");
@@ -22,12 +15,6 @@ describe("deriveJobSubdir", () => {
     // Both should start with the same slug 'x-' but differ in hash suffix
     expect(a.startsWith("x-")).toBe(true);
     expect(b.startsWith("x-")).toBe(true);
-  });
-
-  it("same slug from different absolute paths yields distinct subdirs", () => {
-    const p1 = deriveJobSubdir("/alpha/session.mkv");
-    const p2 = deriveJobSubdir("/beta/session.mkv");
-    expect(p1).not.toBe(p2);
   });
 
   it("output matches /^[a-z0-9-]+-[0-9a-f]{8}$/ for a normal path", () => {

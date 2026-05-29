@@ -1,6 +1,5 @@
 import { createTranscriberSignature } from "../../domain/ports/transcriber.js";
 import { ValidationError } from "../../shared/errors.js";
-import { chunkAudioFormat } from "../../shared/chunk-audio-format.js";
 import {
   assertOpenAIAudioChunkFitsUploadLimit,
   normalizeOptionalValue,
@@ -29,7 +28,6 @@ export interface OpenAIWhisperConfig {
   deployment: null;
   transcriberSignature: string;
   uploadLimitBytes: number;
-  chunkFormat: typeof chunkAudioFormat;
 }
 
 export function createOpenAIWhisperConfig(env: NodeJS.ProcessEnv = process.env): OpenAIWhisperConfig {
@@ -62,7 +60,6 @@ export function createOpenAIWhisperConfig(env: NodeJS.ProcessEnv = process.env):
       prompt,
     }),
     uploadLimitBytes: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES,
-    chunkFormat: chunkAudioFormat,
   };
 }
 
