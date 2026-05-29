@@ -42,40 +42,33 @@ export class WikiCliApplication {
     try {
       const parsed = this.argumentParser.parse(argv);
 
-      if (parsed.kind === "help") {
-        this.writeStdout(parsed.text);
-        return 0;
+      switch (parsed.kind) {
+        case "help":
+          this.writeStdout(parsed.text);
+          return 0;
+        case "init":
+          this.writeStdout(this.renderMutationResult(await this.codeWikiService.init(parsed.wikiRoot), "init"));
+          return 0;
+        case "refresh":
+          this.writeStdout(this.renderMutationResult(await this.codeWikiService.refresh(parsed.wikiRoot), "refresh"));
+          return 0;
+        case "ingest":
+          this.writeStdout(this.renderMutationResult(
+            await this.codeWikiService.ingest(parsed.sourcePaths, parsed.wikiRoot),
+            "ingest",
+          ));
+          return 0;
+        case "query":
+          this.writeStdout(this.renderQueryResult(await this.codeWikiService.query(
+            parsed.query,
+            parsed.wikiRoot,
+            parsed.limit,
+          )));
+          return 0;
+        case "lint":
+          this.writeStdout(this.renderLintResult(await this.codeWikiService.lint(parsed.wikiRoot)));
+          return 0;
       }
-
-      if (parsed.kind === "init") {
-        this.writeStdout(this.renderMutationResult(await this.codeWikiService.init(parsed.wikiRoot), "init"));
-        return 0;
-      }
-
-      if (parsed.kind === "refresh") {
-        this.writeStdout(this.renderMutationResult(await this.codeWikiService.refresh(parsed.wikiRoot), "refresh"));
-        return 0;
-      }
-
-      if (parsed.kind === "ingest") {
-        this.writeStdout(this.renderMutationResult(
-          await this.codeWikiService.ingest(parsed.sourcePaths, parsed.wikiRoot),
-          "ingest",
-        ));
-        return 0;
-      }
-
-      if (parsed.kind === "query") {
-        this.writeStdout(this.renderQueryResult(await this.codeWikiService.query(
-          parsed.query,
-          parsed.wikiRoot,
-          parsed.limit,
-        )));
-        return 0;
-      }
-
-      this.writeStdout(this.renderLintResult(await this.codeWikiService.lint(parsed.wikiRoot)));
-      return 0;
     } catch (error) {
       logger.error("wiki", error instanceof Error ? error.message : String(error));
       return 1;

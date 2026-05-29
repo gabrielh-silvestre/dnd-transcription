@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import { ValidationError } from "../../shared/errors.js";
@@ -10,6 +10,7 @@ import {
   type CodeWikiPageDefinition,
 } from "./code-wiki-page-definitions.js";
 import { collectCodeWikiRepoSnapshot } from "./code-wiki-repo-snapshot.js";
+import { walkFiles } from "../shared/walk-files.js";
 import {
   DEFAULT_CODE_WIKI_ROOT,
   relativeToRepoRoot,
@@ -53,6 +54,15 @@ interface SearchableWikiPage {
   summary: string;
   body: string;
 }
+
+interface LintFindings {
+  missingRequiredPages: string[];
+  unindexedPages: string[];
+  orphanPages: string[];
+  brokenLinks: string[];
+}
+
+const MARKDOWN_LINK_PATTERN = /\[[^\]]+\]\(([^)]+)\)/gu;
 
 function matchSourcePath(sourcePath: string, prefix: string): boolean {
   if (sourcePath === prefix) {
@@ -160,18 +170,30 @@ function renderLogHeader(): string {
   ].join("\n");
 }
 
-function stripFrontmatter(content: string): string {
+interface ParsedFrontmatter {
+  frontmatter: string;
+  body: string;
+}
+
+function splitFrontmatter(content: string): ParsedFrontmatter | null {
   if (!content.startsWith("---\n")) {
-    return content;
+    return null;
   }
 
   const closingIndex = content.indexOf("\n---\n", 4);
 
   if (closingIndex === -1) {
-    return content;
+    return null;
   }
 
-  return content.slice(closingIndex + 5);
+  return {
+    frontmatter: content.slice(4, closingIndex),
+    body: content.slice(closingIndex + 5),
+  };
+}
+
+function stripFrontmatter(content: string): string {
+  return splitFrontmatter(content)?.body ?? content;
 }
 
 function tokenize(text: string): string[] {
@@ -226,9 +248,8 @@ function buildSnippet(body: string, terms: readonly string[]): string {
 
 function parseMarkdownLinks(content: string): string[] {
   const links: string[] = [];
-  const pattern = /\[[^\]]+\]\(([^)]+)\)/gu;
 
-  for (const match of content.matchAll(pattern)) {
+  for (const match of content.matchAll(MARKDOWN_LINK_PATTERN)) {
     const rawTarget = match[1]?.trim();
 
     if (rawTarget === undefined || rawTarget.length === 0) {
@@ -253,17 +274,13 @@ function parseMarkdownLinks(content: string): string[] {
 }
 
 function readFrontmatterField(content: string, field: string): string | null {
-  if (!content.startsWith("---\n")) {
+  const parsed = splitFrontmatter(content);
+
+  if (parsed === null) {
     return null;
   }
 
-  const closingIndex = content.indexOf("\n---\n", 4);
-
-  if (closingIndex === -1) {
-    return null;
-  }
-
-  const frontmatter = content.slice(4, closingIndex);
+  const frontmatter = parsed.frontmatter;
   const pattern = new RegExp(`^${field}:\\s*(.+)$`, "mu");
   const match = frontmatter.match(pattern);
   const value = match?.[1]?.trim();
@@ -297,7 +314,7 @@ function extractSummary(content: string): string {
   }
 
   const body = stripFrontmatter(content)
-    .replace(/\[[^\]]+\]\(([^)]+)\)/gu, "$1")
+    .replace(MARKDOWN_LINK_PATTERN, "$1")
     .replace(/`([^`]+)`/gu, "$1");
 
   for (const line of body.split("\n")) {
@@ -334,33 +351,10 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 async function listMarkdownFiles(rootDir: string): Promise<string[]> {
-  try {
-    const entries = await readdir(rootDir, { withFileTypes: true });
-    const files: string[] = [];
-
-    for (const entry of entries) {
-      const absolutePath = join(rootDir, entry.name);
-
-      if (entry.isDirectory()) {
-        files.push(...(await listMarkdownFiles(absolutePath)));
-        continue;
-      }
-
-      if (entry.isFile() && entry.name.endsWith(".md")) {
-        files.push(toPosixPath(absolutePath));
-      }
-    }
-
-    return files.sort();
-  } catch (error) {
-    const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined;
-
-    if (code === "ENOENT") {
-      return [];
-    }
-
-    throw error;
-  }
+  return await walkFiles(rootDir, {
+    filter: (absolutePath) => absolutePath.endsWith(".md"),
+    map: (absolutePath) => toPosixPath(absolutePath),
+  });
 }
 
 export class CodeWikiService {
@@ -373,21 +367,28 @@ export class CodeWikiService {
   }
 
   public async init(wikiRoot = DEFAULT_CODE_WIKI_ROOT): Promise<CodeWikiMutationResult> {
-    return await this.writePages({
-      wikiRoot,
-      action: "init",
-      title: "Code Wiki Bootstrap",
-      detailPrefix: "Pages generated",
-      definitions: CODE_WIKI_PAGE_DEFINITIONS,
-    });
+    return await this.writeAllPages("init", wikiRoot);
   }
 
   public async refresh(wikiRoot = DEFAULT_CODE_WIKI_ROOT): Promise<CodeWikiMutationResult> {
+    return await this.writeAllPages("refresh", wikiRoot);
+  }
+
+  private async writeAllPages(action: "init" | "refresh", wikiRoot: string): Promise<CodeWikiMutationResult> {
+    const titles = {
+      init: "Code Wiki Bootstrap",
+      refresh: "Code Wiki Refresh",
+    } as const;
+    const detailPrefixes = {
+      init: "Pages generated",
+      refresh: "Pages refreshed",
+    } as const;
+
     return await this.writePages({
       wikiRoot,
-      action: "refresh",
-      title: "Code Wiki Refresh",
-      detailPrefix: "Pages refreshed",
+      action,
+      title: titles[action],
+      detailPrefix: detailPrefixes[action],
       definitions: CODE_WIKI_PAGE_DEFINITIONS,
     });
   }
@@ -457,6 +458,21 @@ export class CodeWikiService {
 
   public async lint(wikiRoot = DEFAULT_CODE_WIKI_ROOT): Promise<CodeWikiLintResult> {
     const paths = resolveCodeWikiPaths(this.repoRoot, wikiRoot);
+    const findings = await this.collectLintFindings(paths);
+
+    await this.persistLintReport(paths, findings);
+
+    return {
+      wikiRoot: relativeToRepoRoot(this.repoRoot, paths.rootDir),
+      reportPath: relativeToRepoRoot(this.repoRoot, paths.lintReportPath),
+      missingRequiredPages: findings.missingRequiredPages,
+      unindexedPages: findings.unindexedPages,
+      orphanPages: findings.orphanPages,
+      brokenLinks: findings.brokenLinks,
+    };
+  }
+
+  private async collectLintFindings(paths: CodeWikiPaths): Promise<LintFindings> {
     const absoluteMarkdownFiles = await listMarkdownFiles(paths.rootDir);
     const pagePaths = absoluteMarkdownFiles
       .map((absolutePath) => relativeToWikiRoot(paths, absolutePath))
@@ -515,30 +531,26 @@ export class CodeWikiService {
       .filter((pagePath) => pagePath !== "index.md" && pagePath !== "log.md")
       .filter((pagePath) => (inboundCounts.get(pagePath) ?? 0) === 0)
       .sort();
-    const report = this.renderLintReport({
-      missingRequiredPages,
-      unindexedPages,
-      orphanPages,
-      brokenLinks: uniqueSorted(brokenLinks),
-    });
-
-    await mkdir(paths.reportsDir, { recursive: true });
-    await writeTextFile(paths.lintReportPath, report);
-    await this.appendLogEntry(paths, "lint", "Code Wiki Health Check", [
-      `- missing required pages: ${missingRequiredPages.length}`,
-      `- unindexed pages: ${unindexedPages.length}`,
-      `- orphan pages: ${orphanPages.length}`,
-      `- broken links: ${uniqueSorted(brokenLinks).length}`,
-    ]);
 
     return {
-      wikiRoot: relativeToRepoRoot(this.repoRoot, paths.rootDir),
-      reportPath: relativeToRepoRoot(this.repoRoot, paths.lintReportPath),
       missingRequiredPages,
       unindexedPages,
       orphanPages,
       brokenLinks: uniqueSorted(brokenLinks),
     };
+  }
+
+  private async persistLintReport(paths: CodeWikiPaths, findings: LintFindings): Promise<void> {
+    const report = this.renderLintReport(findings);
+
+    await mkdir(paths.reportsDir, { recursive: true });
+    await writeTextFile(paths.lintReportPath, report);
+    await this.appendLogEntry(paths, "lint", "Code Wiki Health Check", [
+      `- missing required pages: ${findings.missingRequiredPages.length}`,
+      `- unindexed pages: ${findings.unindexedPages.length}`,
+      `- orphan pages: ${findings.orphanPages.length}`,
+      `- broken links: ${findings.brokenLinks.length}`,
+    ]);
   }
 
   private async loadSearchablePages(paths: CodeWikiPaths): Promise<SearchableWikiPage[]> {

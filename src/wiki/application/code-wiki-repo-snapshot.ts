@@ -1,6 +1,6 @@
-import { readdir } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
+import { walkFiles } from "../shared/walk-files.js";
 import { toPosixPath } from "../shared/wiki-paths.js";
 
 export interface CodeWikiRepoSnapshot {
@@ -18,33 +18,9 @@ export interface CodeWikiRepoSnapshot {
 }
 
 async function listFilesRecursive(root: string, currentDir: string): Promise<string[]> {
-  try {
-    const entries = await readdir(currentDir, { withFileTypes: true });
-    const files: string[] = [];
-
-    for (const entry of entries) {
-      const absolutePath = join(currentDir, entry.name);
-
-      if (entry.isDirectory()) {
-        files.push(...await listFilesRecursive(root, absolutePath));
-        continue;
-      }
-
-      if (entry.isFile()) {
-        files.push(toPosixPath(relative(root, absolutePath)));
-      }
-    }
-
-    return files.sort();
-  } catch (error) {
-    const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined;
-
-    if (code === "ENOENT") {
-      return [];
-    }
-
-    throw error;
-  }
+  return await walkFiles(currentDir, {
+    map: (absolutePath) => toPosixPath(relative(root, absolutePath)),
+  });
 }
 
 function filesUnder(files: readonly string[], prefix: string): string[] {
