@@ -25,15 +25,7 @@ const allowedChunkTransitions: Record<ChunkStatus, readonly ChunkStatus[]> = {
 };
 
 function cloneChunkState(state: ChunkState): ChunkState {
-  return {
-    index: state.index,
-    status: state.status,
-    attempts: state.attempts,
-    errorSummary: state.errorSummary,
-    markdownPath: state.markdownPath,
-    startedAt: state.startedAt,
-    finishedAt: state.finishedAt,
-  };
+  return { ...state };
 }
 
 function assertValidChunkIndex(index: number): void {

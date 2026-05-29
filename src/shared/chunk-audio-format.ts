@@ -6,7 +6,7 @@ export const chunkAudioFormat = Object.freeze({
   channels: 1,
   sampleRateHz: 16_000,
   wavHeaderBytes: 44,
-});
+} as const);
 
 export const chunkAudioBytesPerSecond = (
   chunkAudioFormat.channels

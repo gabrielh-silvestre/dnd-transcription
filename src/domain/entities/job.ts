@@ -50,14 +50,7 @@ const allowedJobTransitions: Record<JobStatus, readonly JobStatus[]> = {
 };
 
 function cloneCompatibilitySnapshot(snapshot: JobCompatibilitySnapshot): JobCompatibilitySnapshot {
-  return {
-    resolvedInputPath: snapshot.resolvedInputPath,
-    inputSizeBytes: snapshot.inputSizeBytes,
-    inputMtimeMs: snapshot.inputMtimeMs,
-    provider: snapshot.provider,
-    transcriberSignature: snapshot.transcriberSignature,
-    chunkDurationSeconds: snapshot.chunkDurationSeconds,
-  };
+  return { ...snapshot };
 }
 
 function sortChunksByIndex(chunks: readonly JobChunk[]): JobChunk[] {
@@ -124,16 +117,7 @@ export class Job {
     }
 
     return new Job({
-      version: state.version,
-      jobId: state.jobId,
-      createdAt: state.createdAt,
-      updatedAt: state.updatedAt,
-      provider: state.provider,
-      cleanupPolicy: state.cleanupPolicy,
-      status: state.status,
-      errorSummary: state.errorSummary,
-      manifestPath: state.manifestPath,
-      finalMarkdownPath: state.finalMarkdownPath,
+      ...state,
       compatibility: cloneCompatibilitySnapshot(state.compatibility),
       chunks: state.chunks.map((chunk) => JobChunk.restore(chunk).toState()),
     });
@@ -234,15 +218,14 @@ export class Job {
   }
 
   public get exitCode(): PipelineExitCode {
-    if (this.status === "succeeded") {
-      return 0;
+    switch (this.status) {
+      case "succeeded":
+        return 0;
+      case "partial_failed":
+        return 2;
+      default:
+        return 1;
     }
-
-    if (this.status === "partial_failed") {
-      return 2;
-    }
-
-    return 1;
   }
 
   public touch(updatedAt = new Date().toISOString()): this {
@@ -306,12 +289,7 @@ export class Job {
 
   public reconcileForResume(): this {
     for (const chunk of this.chunkList) {
-      if (chunk.status === "failed") {
-        chunk.returnToPending();
-        continue;
-      }
-
-      if (chunk.status === "running" && chunk.finishedAt === null) {
+      if (chunk.status === "failed" || (chunk.status === "running" && chunk.finishedAt === null)) {
         chunk.returnToPending();
       }
     }

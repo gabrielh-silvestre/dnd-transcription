@@ -92,7 +92,7 @@ export class RunTranscriptionJobUseCase {
         return this.buildResultFromState(currentState);
       }
 
-      currentState = await this.ensureRunningState(input, currentState);
+      currentState = await this.transitionToRunningIfNeeded(input, currentState);
 
       const manifest = await input.jobStore.readManifest();
       const pendingChunks = this.collectPendingChunks(currentState, manifest);
@@ -286,7 +286,7 @@ export class RunTranscriptionJobUseCase {
     }
   }
 
-  private async ensureRunningState(
+  private async transitionToRunningIfNeeded(
     input: RunTranscriptionJobUseCaseInput,
     state: JobState,
   ): Promise<JobState> {
