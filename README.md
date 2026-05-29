@@ -15,6 +15,39 @@ CLI em TypeScript para fracionar arquivos `.mkv` longos em chunks `.wav`, transc
 
 ## Uso
 
+### Multiplos arquivos de entrada
+
+Passe `--input` uma vez por arquivo para transcrever varios arquivos em uma unica invocacao:
+
+```bash
+npm run transcribe -- \
+  --input sessao1.mkv \
+  --input sessao2.mkv \
+  --input sessao3.mkv \
+  --output ./tmp/batch \
+  --provider openai-whisper \
+  --file-concurrency 2
+```
+
+**Layout de saida (importante):**
+
+| Entradas | Layout |
+|----------|--------|
+| 1 arquivo | `<output>/transcript.md` (flat, compativel com versoes anteriores) |
+| 2+ arquivos | `<output>/<slug>-<hash>/transcript.md` por arquivo |
+
+Com N >= 2, cada arquivo recebe seu proprio subdiretorio: o slug e o nome base sanitizado e o hash sao os 8 primeiros hex do sha256 do caminho absoluto resolvido, garantindo que arquivos com o mesmo nome nao colidam. Um mesmo arquivo que era executado sozinho (saindo em `<output>/transcript.md`) passara a sair em `<output>/<slug>-<hash>/transcript.md` ao receber um segundo `--input`.
+
+**`<output>/batch-index.json`** (gerado apenas com N >= 2): mapeia cada caminho de entrada para seu subdiretorio, exit code e status, na ordem dos inputs — util para localizar saidas quando nomes de arquivo colidem.
+
+**`--file-concurrency <n>` (default 1):** quantos arquivos sao transcritos em paralelo. O total de chamadas simultaneas ao provider e aproximadamente `file-concurrency × concurrency` (onde `--concurrency` e a concorrencia por-arquivo de chunks). O default 1 mantem a mesma carga no provider que a versao anterior. Um aviso suave (nunca fatal) e registrado quando `file-concurrency × concurrency > 16`.
+
+**Retomada em lote:** `--resume` se aplica por arquivo — arquivos com artefatos previos compativeis retomam, arquivos novos comecam do zero, e um arquivo cujo input mudou (snapshot incompativel) falha fatalmente sem afetar os demais.
+
+**Exit codes em lote:** qualquer falha fatal em algum arquivo => exit 1; sem fatais mas com falhas parciais => exit 2; tudo bem-sucedido => exit 0.
+
+---
+
 ### Provider fake
 
 ```bash

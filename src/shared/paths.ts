@@ -1,4 +1,5 @@
-import { join, relative, resolve, sep } from "node:path";
+import { createHash } from "node:crypto";
+import { basename, extname, join, relative, resolve, sep } from "node:path";
 
 export type CleanupPolicy = "on-success" | "keep";
 
@@ -46,4 +47,14 @@ export function normalizeRelativePath(rootDir: string, targetPath: string): stri
 
 export function resolveFromRoot(rootDir: string, relativePath: string): string {
   return resolve(rootDir, relativePath);
+}
+
+export function deriveJobSubdir(resolvedAbsolutePath: string): string {
+  const hash = createHash("sha256").update(resolvedAbsolutePath).digest("hex").slice(0, 8);
+  const name = basename(resolvedAbsolutePath, extname(resolvedAbsolutePath));
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "input";
+  return `${slug}-${hash}`;
 }

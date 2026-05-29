@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path";
+
 import { describe, expect, it } from "@jest/globals";
 
 import {
@@ -15,11 +17,12 @@ import { resolveJobPaths } from "../../src/shared/paths.js";
 
 function createCliOptions(): CliOptions {
   return {
-    inputPath: "input.mkv",
+    inputPaths: ["input.mkv"],
     outputDir: "./tmp/job",
     chunkDurationSeconds: 60,
     chunkDurationMs: 60_000,
     concurrency: 2,
+    fileConcurrency: 1,
     provider: "fake",
     cleanupPolicy: "keep",
     resume: false,
@@ -160,5 +163,63 @@ describe("Transcription CLI application", () => {
     const boundTranscriber = capturedInput?.transcriberBinding?.createTranscriber();
     expect(boundTranscriber instanceof Promise).toBe(false);
     expect(boundTranscriber).toBe(transcriber);
+  });
+
+  it("resolve caminhos de entrada relativos para absolutos antes do batch", async () => {
+    const options: CliOptions = { ...createCliOptions(), inputPaths: ["sub/rel.mkv"] };
+    const argumentParser: CliArgumentParserLike = {
+      parse() {
+        return {
+          kind: "run",
+          options,
+        };
+      },
+    };
+    const transcriber: Transcriber = {
+      name: "fake",
+      signature: createTranscriberSignature({
+        provider: "fake",
+        variant: "abs",
+      }),
+      async transcribe() {
+        return {
+          chunkIndex: 1,
+          markdown: "noop",
+        };
+      },
+    };
+    const segmenterPaths: string[] = [];
+
+    const application = new TranscriptionCliApplication(
+      {
+        createLogger: createSilentLogger,
+        createJobStore: () => ({}) as unknown as JobStore,
+        createMediaSegmenter: (resolvedInputPath) => {
+          segmenterPaths.push(resolvedInputPath);
+
+          return { name: "segmenter" } as unknown as MediaSegmenter;
+        },
+        createTranscriber: () => transcriber,
+      },
+      {
+        argumentParser,
+        loadEnvFile: async () => ({}),
+        runTranscriptionJobUseCase: {
+          execute: async () => ({
+            exitCode: 0,
+            jobStatus: "succeeded",
+            failedChunks: [],
+            finalMarkdownPath: null,
+            errorSummary: null,
+          }),
+        },
+      },
+    );
+
+    const exitCode = await application.run([]);
+
+    expect(exitCode).toBe(0);
+    expect(segmenterPaths).toHaveLength(1);
+    expect(isAbsolute(segmenterPaths[0]!)).toBe(true);
   });
 });

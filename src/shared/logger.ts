@@ -33,3 +33,17 @@ export function createLogger(): Logger {
     },
   };
 }
+
+export function createChildLogger(base: Logger, prefix: string): Logger {
+  return {
+    info(scope, message, metadata) {
+      base.info(`${prefix}:${scope}`, message, metadata);
+    },
+    warn(scope, message, metadata) {
+      base.warn(`${prefix}:${scope}`, message, metadata);
+    },
+    error(scope, message, metadata) {
+      base.error(`${prefix}:${scope}`, message, metadata);
+    },
+  };
+}

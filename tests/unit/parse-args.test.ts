@@ -1,12 +1,24 @@
 import { describe, expect, it } from "@jest/globals";
 
+import { ValidationError } from "../../src/shared/errors.js";
 import {
   CliArgumentParser,
   CLI_USAGE,
+  type CliRunResult,
   parseArgs,
   toChunkDurationMs,
 } from "../../src/cli/cli-argument-parser.js";
 import { CLI_DEFAULT_RAW_INPUT_DIR } from "../../src/cli/input-path-resolver.js";
+
+function parseRun(argv: string[]): CliRunResult {
+  const parsed = new CliArgumentParser().parse(argv);
+
+  if (parsed.kind !== "run") {
+    throw new Error("Resultado inesperado");
+  }
+
+  return parsed;
+}
 
 describe("CLI argument parser", () => {
   it("converte segundos para ms e preserva --resume", () => {
@@ -35,6 +47,126 @@ describe("CLI argument parser", () => {
     expect(parsed.options.chunkDurationMs).toBe(600_000);
     expect(parsed.options.resume).toBe(true);
     expect(toChunkDurationMs(60)).toBe(60_000);
+  });
+
+  it("coleta um unico --input em inputPaths sem resolver o caminho", () => {
+    const parsed = parseRun([
+      "--input",
+      "./input.mkv",
+      "--output",
+      "./tmp/job",
+      "--chunk-duration-seconds",
+      "600",
+      "--concurrency",
+      "3",
+      "--provider",
+      "fake",
+      "--cleanup-policy",
+      "keep",
+    ]);
+
+    expect(parsed.options.inputPaths).toStrictEqual(["./input.mkv"]);
+  });
+
+  it("acumula --input repetidos preservando a ordem", () => {
+    const parsed = parseRun([
+      "--input",
+      "a",
+      "--input",
+      "b",
+      "--input",
+      "c",
+      "--output",
+      "./tmp/job",
+      "--chunk-duration-seconds",
+      "600",
+      "--concurrency",
+      "3",
+      "--provider",
+      "fake",
+      "--cleanup-policy",
+      "keep",
+    ]);
+
+    expect(parsed.options.inputPaths).toStrictEqual(["a", "b", "c"]);
+  });
+
+  it("rejeita quando --input esta ausente", () => {
+    expect(() => {
+      parseArgs([
+        "--output",
+        "./tmp/job",
+        "--chunk-duration-seconds",
+        "600",
+        "--concurrency",
+        "3",
+        "--provider",
+        "fake",
+        "--cleanup-policy",
+        "keep",
+      ]);
+    }).toThrow(ValidationError);
+  });
+
+  it("usa file-concurrency padrao 1 quando ausente", () => {
+    const parsed = parseRun([
+      "--input",
+      "./input.mkv",
+      "--output",
+      "./tmp/job",
+      "--chunk-duration-seconds",
+      "600",
+      "--concurrency",
+      "3",
+      "--provider",
+      "fake",
+      "--cleanup-policy",
+      "keep",
+    ]);
+
+    expect(parsed.options.fileConcurrency).toBe(1);
+  });
+
+  it("le file-concurrency explicito", () => {
+    const parsed = parseRun([
+      "--input",
+      "./input.mkv",
+      "--output",
+      "./tmp/job",
+      "--chunk-duration-seconds",
+      "600",
+      "--concurrency",
+      "3",
+      "--file-concurrency",
+      "4",
+      "--provider",
+      "fake",
+      "--cleanup-policy",
+      "keep",
+    ]);
+
+    expect(parsed.options.fileConcurrency).toBe(4);
+  });
+
+  it("rejeita file-concurrency nao positivo", () => {
+    expect(() => {
+      parseArgs([
+        "--input",
+        "./input.mkv",
+        "--output",
+        "./tmp/job",
+        "--chunk-duration-seconds",
+        "600",
+        "--concurrency",
+        "3",
+        "--file-concurrency",
+        "0",
+        "--provider",
+        "fake",
+        "--cleanup-policy",
+        "keep",
+      ]);
+    }).toThrow(/file-concurrency/);
   });
 
   it("retorna help quando solicitado", () => {

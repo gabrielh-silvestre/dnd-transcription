@@ -9,11 +9,12 @@ import { type OpenAIAudioClient } from "../../src/infrastructure/providers/opena
 
 function createCliOptions(provider: string): CliOptions {
   return {
-    inputPath: "./input.mkv",
+    inputPaths: ["./input.mkv"],
     outputDir: "./tmp/job",
     chunkDurationSeconds: 60,
     chunkDurationMs: 60_000,
     concurrency: 2,
+    fileConcurrency: 1,
     provider,
     cleanupPolicy: "keep",
     resume: false,

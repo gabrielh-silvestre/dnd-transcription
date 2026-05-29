@@ -8,8 +8,12 @@ This repository contains a TypeScript CLI for chunking long media files, transcr
 npm run build
 npm test
 npm run transcribe -- --input <file.mkv> --output <dir> --provider <provider>
+# Multi-file batch (N>=2 inputs):
+npm run transcribe -- --input <a.mkv> --input <b.mkv> --output <dir> --provider <provider> --file-concurrency <n>
 npm run wiki -- <init|refresh|ingest|query|lint>
 ```
+
+Multi-file layout switch: a single `--input` writes the legacy flat `<output>/transcript.md`; two or more inputs write `<output>/<slug>-<hash>/transcript.md` per file and `<output>/batch-index.json`. `--file-concurrency` (default 1) sets how many files run in parallel; total in-flight provider calls ≈ `file-concurrency × concurrency`.
 
 Focused checks:
 
