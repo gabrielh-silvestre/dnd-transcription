@@ -13,7 +13,7 @@ This file is deterministic evidence for the repository's testing posture.
 
 ## Current shape
 
-- test files: 32
+- test files: 33
 
 ## Main test layers
 
@@ -60,5 +60,6 @@ This file is deterministic evidence for the repository's testing posture.
 - `tests/unit/task-pool.test.ts`
 - `tests/unit/transcription-cli-application.test.ts`
 - `tests/unit/wiki/AGENTS.md`
+- `tests/unit/wiki/code-wiki-golden.test.ts`
 - `tests/unit/wiki/code-wiki-service.test.ts`
 - `tests/unit/wiki/wiki-argument-parser.test.ts`
