@@ -85,3 +85,13 @@ Append-only record of code wiki maintenance operations.
 - unindexed pages: 0
 - orphan pages: 0
 - broken links: 0
+## [2026-05-29] ingest | src/application/run-batch-transcription-use-case.ts, src/cli/cli-argument-parser.ts, src/cli/transcription-cli-application.ts, src/infrastructure/storage/file-batch-index-writer.ts, src/shared/logger.ts, src/shared/paths.ts
+
+- Sources: `src/application/run-batch-transcription-use-case.ts`, `src/cli/cli-argument-parser.ts`, `src/cli/transcription-cli-application.ts`, `src/infrastructure/storage/file-batch-index-writer.ts`, `src/shared/logger.ts`, `src/shared/paths.ts`
+- pages updated: `schema.md`, `evidence/overview.md`, `evidence/architecture.md`, `evidence/modules/cli.md`, `evidence/modules/application.md`, `evidence/modules/domain.md`, `evidence/modules/infrastructure.md`, `evidence/workflows/transcription-job.md`, `index.md`, `evidence/index.md`
+## [2026-05-29] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0

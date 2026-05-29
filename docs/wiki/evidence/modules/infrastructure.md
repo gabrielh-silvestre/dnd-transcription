@@ -27,9 +27,13 @@ This file is deterministic evidence for the infrastructure layer.
 
 ## Relevant files
 
+- `src/infrastructure/AGENTS.md`
+- `src/infrastructure/concurrency/AGENTS.md`
 - `src/infrastructure/concurrency/task-pool.ts`
+- `src/infrastructure/media/AGENTS.md`
 - `src/infrastructure/media/ffmpeg-media-segmenter.ts`
 - `src/infrastructure/media/ffprobe.ts`
+- `src/infrastructure/providers/AGENTS.md`
 - `src/infrastructure/providers/fake-transcriber.ts`
 - `src/infrastructure/providers/openai-audio-client.ts`
 - `src/infrastructure/providers/openai-audio-provider-shared.ts`
@@ -37,7 +41,9 @@ This file is deterministic evidence for the infrastructure layer.
 - `src/infrastructure/providers/openai-transcription-config.ts`
 - `src/infrastructure/providers/openai-whisper-config.ts`
 - `src/infrastructure/providers/openai-whisper-transcriber.ts`
+- `src/infrastructure/storage/AGENTS.md`
 - `src/infrastructure/storage/chunk-manifest-record.ts`
+- `src/infrastructure/storage/file-batch-index-writer.ts`
 - `src/infrastructure/storage/file-job-store.ts`
 - `src/infrastructure/storage/job-persistence-mapper.ts`
 - `src/infrastructure/storage/job-state-record.ts`

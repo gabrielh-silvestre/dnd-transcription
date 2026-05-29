@@ -36,6 +36,7 @@ This file is deterministic evidence for the CLI layer.
 
 ## Relevant files
 
+- `src/cli/AGENTS.md`
 - `src/cli/cli-argument-parser.ts`
 - `src/cli/default-transcriber-binding-factory.ts`
 - `src/cli/input-path-resolver.ts`

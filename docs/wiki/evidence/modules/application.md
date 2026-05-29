@@ -33,5 +33,7 @@ This file is deterministic evidence for the application layer.
 
 ## Relevant files
 
+- `src/application/AGENTS.md`
 - `src/application/merge-transcripts-use-case.ts`
+- `src/application/run-batch-transcription-use-case.ts`
 - `src/application/run-transcription-job-use-case.ts`

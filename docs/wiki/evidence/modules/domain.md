@@ -32,10 +32,13 @@ This file is deterministic evidence for the domain layer.
 
 ## Relevant files
 
+- `src/domain/AGENTS.md`
+- `src/domain/entities/AGENTS.md`
 - `src/domain/entities/chunk-manifest.ts`
 - `src/domain/entities/job-chunk.ts`
 - `src/domain/entities/job.ts`
 - `src/domain/entities/transcription-result.ts`
+- `src/domain/ports/AGENTS.md`
 - `src/domain/ports/job-store.ts`
 - `src/domain/ports/media-segmenter.ts`
 - `src/domain/ports/transcriber-binding.ts`
