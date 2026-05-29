@@ -5,6 +5,48 @@ import { describe, expect, it } from "@jest/globals";
 import { CodeWikiService } from "../../../src/wiki/application/code-wiki-service.js";
 import { createTempDir } from "../../helpers/temp-dir.js";
 
+// Pinned against the pre-simplification code. These guard the query scoring
+// formula (termScore * 10 + layerBoost, where pages/ -> 2 and evidence/ -> 1)
+// and the occurrence count (multiple "resume" hits in the resume-guide page).
+// resume-guide (82) and resume-semantics (81) share termScore 8 but differ by
+// the layerBoost only (pages/ = 2 vs evidence/ = 1), so the boost is observable.
+const QUERY_SCORE_RANKING = [
+  "pages/resume-guide.md",
+  "evidence/workflows/resume-semantics.md",
+  "pages/lonely-snapshot.md",
+  "evidence/index.md",
+  "evidence/modules/application.md",
+];
+const QUERY_SCORE_RESUME_GUIDE = 82;
+const QUERY_SCORE_LONELY_SNAPSHOT = 52;
+const QUERY_SCORE_EVIDENCE_RESUME = 81;
+
+// Pinned against the pre-simplification renderLintReport output. The injected
+// fixed clock keeps generated_at deterministic, so the whole report is asserted.
+const LINT_REPORT_EXPECTED = [
+  "# Code Wiki Lint Report",
+  "",
+  "- status: FAIL",
+  "- generated_at: 2026-04-20T12:00:00.000Z",
+  "",
+  "## Missing Required Pages",
+  "",
+  "- none",
+  "",
+  "## Unindexed Pages",
+  "",
+  "- `custom.md`",
+  "",
+  "## Orphan Pages",
+  "",
+  "- `custom.md`",
+  "",
+  "## Broken Links",
+  "",
+  "- `custom.md -> ./missing.md`",
+  "",
+].join("\n");
+
 async function createRepoFixture(root: string): Promise<void> {
   await Promise.all([
     mkdir(join(root, "src", "cli"), { recursive: true }),
@@ -146,6 +188,78 @@ describe("Code wiki service", () => {
 
     expect(result.updatedPages.includes("pages/index.md")).toBe(false);
     expect(refinedIndex).toBe(customRefinedIndex);
+  });
+
+  it("pontua e ordena matches de query de forma deterministica entre camadas", async () => {
+    const root = await createTempDir("code-wiki-query-score");
+    await createRepoFixture(root);
+    const service = new CodeWikiService({
+      cwd: root,
+      now: () => new Date("2026-04-20T12:00:00.000Z"),
+    });
+
+    await service.init();
+    await writeFile(
+      join(root, "docs", "wiki", "pages", "resume-guide.md"),
+      [
+        "---",
+        'title: "Resume Guide"',
+        'summary: "Refined explanation of resume semantics."',
+        "---",
+        "",
+        "# Resume Guide",
+        "",
+        "## What It Covers",
+        "",
+        "Resume resume resume keeps the resume snapshot stable across reruns.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "docs", "wiki", "pages", "lonely-snapshot.md"),
+      [
+        "---",
+        'title: "Lonely Snapshot"',
+        'summary: "Refined snapshot note."',
+        "---",
+        "",
+        "# Lonely Snapshot",
+        "",
+        "Snapshot stays consistent for resume flows.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const matches = await service.query("resume snapshot", "docs/wiki", 5);
+    const byPath = new Map(matches.map((match) => [match.path, match.score]));
+
+    expect(matches.map((match) => match.path)).toEqual(QUERY_SCORE_RANKING);
+    expect(byPath.get("pages/resume-guide.md")).toBe(QUERY_SCORE_RESUME_GUIDE);
+    expect(byPath.get("pages/lonely-snapshot.md")).toBe(QUERY_SCORE_LONELY_SNAPSHOT);
+    expect(byPath.get("evidence/workflows/resume-semantics.md")).toBe(QUERY_SCORE_EVIDENCE_RESUME);
+  });
+
+  it("renderiza o relatorio de lint byte-a-byte", async () => {
+    const root = await createTempDir("code-wiki-lint-report");
+    await createRepoFixture(root);
+    const service = new CodeWikiService({
+      cwd: root,
+      now: () => new Date("2026-04-20T12:00:00.000Z"),
+    });
+
+    await service.init();
+    await writeFile(
+      join(root, "docs", "wiki", "custom.md"),
+      "# Custom\n\nVeja [missing](./missing.md).\n",
+      "utf8",
+    );
+
+    const result = await service.lint();
+    const report = await readFile(join(root, result.reportPath), "utf8");
+
+    expect(report).toBe(LINT_REPORT_EXPECTED);
   });
 
   it("detecta pagina nao indexada, orfa e com link quebrado", async () => {
