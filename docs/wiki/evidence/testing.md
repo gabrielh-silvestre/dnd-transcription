@@ -13,7 +13,7 @@ This file is deterministic evidence for the repository's testing posture.
 
 ## Current shape
 
-- test files: 33
+- test files: 35
 
 ## Main test layers
 
@@ -32,6 +32,8 @@ This file is deterministic evidence for the repository's testing posture.
 
 - `tests/AGENTS.md`
 - `tests/helpers/AGENTS.md`
+- `tests/helpers/cli-harness.ts`
+- `tests/helpers/controlled-transcriber.ts`
 - `tests/helpers/stub-media-segmenter.ts`
 - `tests/helpers/temp-dir.ts`
 - `tests/integration/AGENTS.md`

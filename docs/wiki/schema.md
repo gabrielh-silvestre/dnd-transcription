@@ -78,5 +78,5 @@ This wiki documents the **codebase itself**. It does not track the semantic cont
 ## Current repository snapshot
 
 - source files: 61
-- test files: 33
+- test files: 35
 - plan/context artifacts: 27

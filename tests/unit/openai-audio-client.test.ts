@@ -9,10 +9,25 @@ import {
   createOpenAIAudioSdk,
   DefaultOpenAIAudioClient,
   OpenAIAudioClientError,
+  type OpenAIAudioClientProviderConfig,
   type OpenAIAudioCreateRequest,
   type OpenAIAudioSdkLike,
 } from "../../src/infrastructure/providers/openai-audio-client.js";
 import { createTempDir } from "../helpers/temp-dir.js";
+
+function makeAudioConfig(overrides: Partial<OpenAIAudioClientProviderConfig> = {}): OpenAIAudioClientProviderConfig {
+  return {
+    backend: "openai",
+    apiKey: "sk-test",
+    model: "whisper-1",
+    requestModel: "whisper-1",
+    responseFormat: "json",
+    endpoint: null,
+    apiVersion: null,
+    deployment: null,
+    ...overrides,
+  };
+}
 
 describe("OpenAI audio client", () => {
   it("monta request com whisper-1 e response_format json", async () => {
@@ -33,19 +48,7 @@ describe("OpenAI audio client", () => {
       },
     };
 
-    const client = new DefaultOpenAIAudioClient(
-      {
-        backend: "openai",
-        apiKey: "sk-test",
-        model: "whisper-1",
-        requestModel: "whisper-1",
-        responseFormat: "json",
-        endpoint: null,
-        apiVersion: null,
-        deployment: null,
-      },
-      sdk,
-    );
+    const client = new DefaultOpenAIAudioClient(makeAudioConfig(), sdk);
     const response = await client.transcribe({
       audioPath,
       language: "pt",
@@ -78,19 +81,7 @@ describe("OpenAI audio client", () => {
       },
     };
 
-    const client = new DefaultOpenAIAudioClient(
-      {
-        backend: "openai",
-        apiKey: "sk-test",
-        model: "whisper-1",
-        requestModel: "whisper-1",
-        responseFormat: "json",
-        endpoint: null,
-        apiVersion: null,
-        deployment: null,
-      },
-      sdk,
-    );
+    const client = new DefaultOpenAIAudioClient(makeAudioConfig(), sdk);
 
     const transcriptionPromise = client.transcribe({ audioPath });
 
@@ -106,26 +97,23 @@ describe("OpenAI audio client", () => {
   });
 
   it("instancia OpenAI ou AzureOpenAI conforme o backend", () => {
-    const openaiSdk = createOpenAIAudioSdk({
-      backend: "openai",
-      apiKey: "sk-test",
-      model: "gpt-4o-mini-transcribe",
-      requestModel: "gpt-4o-mini-transcribe",
-      responseFormat: "json",
-      endpoint: null,
-      apiVersion: null,
-      deployment: null,
-    });
-    const azureSdk = createOpenAIAudioSdk({
-      backend: "azure",
-      apiKey: "azure-key",
-      model: "gpt-4o-transcribe",
-      requestModel: "transcribe-prod",
-      responseFormat: "json",
-      endpoint: "https://example-resource.azure.openai.com",
-      apiVersion: "2025-03-01-preview",
-      deployment: "transcribe-prod",
-    });
+    const openaiSdk = createOpenAIAudioSdk(
+      makeAudioConfig({
+        model: "gpt-4o-mini-transcribe",
+        requestModel: "gpt-4o-mini-transcribe",
+      }),
+    );
+    const azureSdk = createOpenAIAudioSdk(
+      makeAudioConfig({
+        backend: "azure",
+        apiKey: "azure-key",
+        model: "gpt-4o-transcribe",
+        requestModel: "transcribe-prod",
+        endpoint: "https://example-resource.azure.openai.com",
+        apiVersion: "2025-03-01-preview",
+        deployment: "transcribe-prod",
+      }),
+    );
 
     expect(openaiSdk).toBeInstanceOf(OpenAI);
     expect(azureSdk).toBeInstanceOf(AzureOpenAI);

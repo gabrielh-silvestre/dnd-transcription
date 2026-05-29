@@ -25,7 +25,7 @@ This file is deterministic evidence generated from repository state. It is input
 - domain files: 11
 - infrastructure files: 20
 - provider files: 8
-- test files: 33
+- test files: 35
 
 ## Generated evidence to read next
 
