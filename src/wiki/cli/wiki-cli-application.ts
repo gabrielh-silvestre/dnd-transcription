@@ -68,6 +68,10 @@ export class WikiCliApplication {
         case "lint":
           this.writeStdout(this.renderLintResult(await this.codeWikiService.lint(parsed.wikiRoot)));
           return 0;
+        // TODO OPT: the pre-refactor dispatch used `lint` as an unconditional catch-all.
+        // This switch relies on `parsed.kind` being a closed discriminated union for
+        // exhaustiveness (build-enforced). Optional: add an explicit `default` (exhaustive
+        // never-check, or lint fallback) to remove the theoretical out-of-union divergence.
       }
     } catch (error) {
       logger.error("wiki", error instanceof Error ? error.message : String(error));

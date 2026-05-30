@@ -195,6 +195,10 @@ export function createOpenAITranscriptionConfig(
       deployment: backendConfig.deployment,
     }),
     uploadLimitBytes: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES,
+    // TODO OPT: this `as` cast exists only because backendConfig.endpoint/apiVersion are
+    // `string | null` (not narrowed per backend), so this single literal can't be inferred
+    // as a discriminated-union member. Optional: make resolveBackendConfig return a union
+    // discriminated on `backend` to restore compile-time discriminant checking and drop the cast.
   } as OpenAITranscriptionConfig;
 }
 
