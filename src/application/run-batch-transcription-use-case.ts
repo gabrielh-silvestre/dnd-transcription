@@ -108,19 +108,7 @@ export class RunBatchTranscriptionUseCase {
   }
 
   private dedupePaths(inputPaths: string[]): string[] {
-    const seen = new Set<string>();
-    const deduped: string[] = [];
-
-    for (const path of inputPaths) {
-      if (seen.has(path)) {
-        continue;
-      }
-
-      seen.add(path);
-      deduped.push(path);
-    }
-
-    return deduped;
+    return [...new Set(inputPaths)];
   }
 
   private aggregateExitCode(results: BatchFileResult[]): 0 | 1 | 2 {
@@ -155,13 +143,7 @@ export class RunBatchTranscriptionUseCase {
       const mediaSegmenter = input.createMediaSegmenter(path);
       const transcriberBinding = input.createTranscriberBinding(path);
 
-      let effectiveResume = input.resume;
-      if (input.resume) {
-        const hasArtifacts = await jobStore.hasPersistedJobArtifacts();
-        if (!hasArtifacts) {
-          effectiveResume = false;
-        }
-      }
+      const effectiveResume = input.resume && (await jobStore.hasPersistedJobArtifacts());
 
       const result = await this.deps.executor.execute({
         inputPath: path,

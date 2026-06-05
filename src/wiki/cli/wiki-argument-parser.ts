@@ -58,7 +58,6 @@ export type WikiCliParseResult =
 
 interface ParsedFlags {
   values: Map<string, string[]>;
-  booleans: Set<string>;
 }
 
 const supportedCommands = new Set(["init", "refresh", "ingest", "query", "lint"]);
@@ -124,7 +123,6 @@ export class WikiArgumentParser {
 
   private parseFlags(argv: readonly string[]): ParsedFlags {
     const values = new Map<string, string[]>();
-    const booleans = new Set<string>();
 
     for (let index = 0; index < argv.length; index += 1) {
       const token = argv[index]!;
@@ -137,11 +135,6 @@ export class WikiArgumentParser {
 
       if (!supportedFlags.has(flag)) {
         throw new ValidationError(`Flag desconhecida: ${flag}`, "wiki");
-      }
-
-      if (flag === "--help") {
-        booleans.add(flag);
-        continue;
       }
 
       const value = inlineValue ?? argv[index + 1];
@@ -159,7 +152,7 @@ export class WikiArgumentParser {
       values.set(flag, currentValues);
     }
 
-    return { values, booleans };
+    return { values };
   }
 
   private readValues(parsed: ParsedFlags, flag: string): string[] {

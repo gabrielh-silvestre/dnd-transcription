@@ -1,4 +1,4 @@
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 import { setTimeout as delay } from "node:timers/promises";
@@ -13,11 +13,10 @@ import { type TranscriptionRequest, type TranscriptionResult } from "../../src/d
 import { type MediaSegmenter, type SegmentMediaInput, type SegmentMediaResult } from "../../src/domain/ports/media-segmenter.js";
 import { bindTranscriber, type TranscriberBinding } from "../../src/domain/ports/transcriber-binding.js";
 import { createTranscriberSignature, type Transcriber } from "../../src/domain/ports/transcriber.js";
-import { FileJobStore } from "../../src/infrastructure/storage/file-job-store.js";
 import { createLogger } from "../../src/shared/logger.js";
-import { resolveJobPaths } from "../../src/shared/paths.js";
+import { createFileJobStore, createInputFixture, createThreeChunkSegmenter } from "../helpers/cli-harness.js";
+import { ControlledTranscriber } from "../helpers/controlled-transcriber.js";
 import { createTempDir } from "../helpers/temp-dir.js";
-import { StubMediaSegmenter } from "../helpers/stub-media-segmenter.js";
 
 class OrderedTranscriber implements Transcriber {
   public readonly name = "fake";
@@ -37,37 +36,6 @@ class OrderedTranscriber implements Transcriber {
     return {
       chunkIndex: input.chunkIndex,
       markdown: `Texto do chunk ${input.chunkIndex}`,
-    };
-  }
-}
-
-class ControlledTranscriber implements Transcriber {
-  public readonly name = "fake";
-  public readonly signature: string;
-  private readonly failuresRemaining: Map<number, number>;
-
-  public constructor(
-    failuresRemaining: Record<number, number>,
-    signature = createTranscriberSignature({
-      provider: "fake",
-      variant: "controlled",
-    }),
-  ) {
-    this.failuresRemaining = new Map(Object.entries(failuresRemaining).map(([key, value]) => [Number(key), value]));
-    this.signature = signature;
-  }
-
-  public async transcribe(input: TranscriptionRequest): Promise<TranscriptionResult> {
-    const remaining = this.failuresRemaining.get(input.chunkIndex) ?? 0;
-
-    if (remaining > 0) {
-      this.failuresRemaining.set(input.chunkIndex, remaining - 1);
-      throw new Error(`falha planejada para chunk ${input.chunkIndex}`);
-    }
-
-    return {
-      chunkIndex: input.chunkIndex,
-      markdown: `Markdown do chunk ${input.chunkIndex}`,
     };
   }
 }
@@ -131,23 +99,6 @@ interface PersistedJobState {
 interface RunTranscriptionJobInput extends Omit<RunTranscriptionJobUseCaseInput, "transcriberBinding"> {
   transcriber?: Transcriber;
   transcriberBinding?: TranscriberBinding;
-}
-
-function createSegmenter(): StubMediaSegmenter {
-  return new StubMediaSegmenter({
-    totalDurationMs: 180_000,
-    chunks: [
-      { index: 1, startMs: 0, endMs: 60_000 },
-      { index: 2, startMs: 60_000, endMs: 120_000 },
-      { index: 3, startMs: 120_000, endMs: 180_000 },
-    ],
-  });
-}
-
-async function createInputFixture(root: string): Promise<string> {
-  const inputPath = join(root, "input.mkv");
-  await writeFile(inputPath, "fixture", "utf8");
-  return inputPath;
 }
 
 async function readPersistedJobState(outputDir: string): Promise<PersistedJobState> {
@@ -294,8 +245,8 @@ describe("Transcription orchestrator", () => {
           "keep",
         ],
         {
-          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-          createMediaSegmenter: () => createSegmenter(),
+          createJobStore: (dir) => createFileJobStore(dir),
+          createMediaSegmenter: () => createThreeChunkSegmenter(),
           createTranscriber: () => new OrderedTranscriber(),
         },
       );
@@ -316,7 +267,7 @@ describe("Transcription orchestrator", () => {
       const outputDir = join(root, "job");
       const inputPath = await createInputFixture(root);
       const inputStats = await stat(inputPath);
-      const jobStore = new FileJobStore(resolveJobPaths(outputDir));
+      const jobStore = createFileJobStore(outputDir);
       const logger = createLogger();
       const transcriberSignature = createTranscriberSignature({
         provider: "fake",
@@ -333,7 +284,7 @@ describe("Transcription orchestrator", () => {
         cleanupPolicy: "keep",
         resume: false,
         jobStore,
-        mediaSegmenter: createSegmenter(),
+        mediaSegmenter: createThreeChunkSegmenter(),
         transcriber: new ControlledTranscriber({ 2: 1 }, transcriberSignature),
         logger,
       });
@@ -393,7 +344,7 @@ describe("Transcription orchestrator", () => {
         cleanupPolicy: "keep",
         resume: true,
         jobStore,
-        mediaSegmenter: createSegmenter(),
+        mediaSegmenter: createThreeChunkSegmenter(),
         transcriber: new ControlledTranscriber({}, transcriberSignature),
         logger,
       });
@@ -447,7 +398,7 @@ describe("Transcription orchestrator", () => {
       const root = await createTempDir("resume-succeeded-noop");
       const outputDir = join(root, "job");
       const inputPath = await createInputFixture(root);
-      const jobStore = new FileJobStore(resolveJobPaths(outputDir));
+      const jobStore = createFileJobStore(outputDir);
       const logger = createLogger();
       const transcriberSignature = createTranscriberSignature({
         provider: "fake",
@@ -464,7 +415,7 @@ describe("Transcription orchestrator", () => {
         cleanupPolicy: "keep",
         resume: false,
         jobStore,
-        mediaSegmenter: createSegmenter(),
+        mediaSegmenter: createThreeChunkSegmenter(),
         transcriber: new ControlledTranscriber({}, transcriberSignature),
         logger,
       });
@@ -501,7 +452,7 @@ describe("Transcription orchestrator", () => {
       const outputDir = join(root, "job");
       const inputPath = await createInputFixture(root);
       const logger = createLogger();
-      const jobStore = new FileJobStore(resolveJobPaths(outputDir));
+      const jobStore = createFileJobStore(outputDir);
 
       await runTranscriptionJob({
         inputPath,
@@ -513,7 +464,7 @@ describe("Transcription orchestrator", () => {
         cleanupPolicy: "keep",
         resume: false,
         jobStore,
-        mediaSegmenter: createSegmenter(),
+        mediaSegmenter: createThreeChunkSegmenter(),
         transcriber: new ControlledTranscriber({}),
         logger,
       });
@@ -528,7 +479,7 @@ describe("Transcription orchestrator", () => {
         cleanupPolicy: "keep",
         resume: true,
         jobStore,
-        mediaSegmenter: createSegmenter(),
+        mediaSegmenter: createThreeChunkSegmenter(),
         transcriber: new ControlledTranscriber(
           {},
           createTranscriberSignature({
@@ -545,7 +496,7 @@ describe("Transcription orchestrator", () => {
       const orphanRoot = await createTempDir("resume-orphan");
       const orphanOutputDir = join(orphanRoot, "job");
       const orphanInputPath = await createInputFixture(orphanRoot);
-      const orphanStore = new FileJobStore(resolveJobPaths(orphanOutputDir));
+      const orphanStore = createFileJobStore(orphanOutputDir);
 
       await orphanStore.initializeJob({
         jobId: "job-orphan",
@@ -564,7 +515,7 @@ describe("Transcription orchestrator", () => {
         },
       });
 
-      const segmenter = createSegmenter();
+      const segmenter = createThreeChunkSegmenter();
       const segmentation = await segmenter.segment({
         inputPath: orphanInputPath,
         jobRootDir: orphanStore.paths.rootDir,
@@ -592,7 +543,7 @@ describe("Transcription orchestrator", () => {
         cleanupPolicy: "keep",
         resume: true,
         jobStore: orphanStore,
-        mediaSegmenter: createSegmenter(),
+        mediaSegmenter: createThreeChunkSegmenter(),
         transcriber: new ControlledTranscriber({}),
         logger,
       });
@@ -613,7 +564,7 @@ describe("Transcription orchestrator", () => {
     const outputDir = join(root, "job");
     const inputPath = await createInputFixture(root);
     const logger = createLogger();
-    const jobStore = new FileJobStore(resolveJobPaths(outputDir));
+    const jobStore = createFileJobStore(outputDir);
 
     await runTranscriptionJob({
       inputPath,
@@ -625,7 +576,7 @@ describe("Transcription orchestrator", () => {
       cleanupPolicy: "keep",
       resume: false,
       jobStore,
-      mediaSegmenter: createSegmenter(),
+      mediaSegmenter: createThreeChunkSegmenter(),
       transcriber: new ControlledTranscriber({ 2: 1 }),
       logger,
     });
@@ -641,7 +592,7 @@ describe("Transcription orchestrator", () => {
       cleanupPolicy: "keep",
       resume: false,
       jobStore,
-      mediaSegmenter: createSegmenter(),
+      mediaSegmenter: createThreeChunkSegmenter(),
       transcriber: new ControlledTranscriber({}),
       logger,
     });

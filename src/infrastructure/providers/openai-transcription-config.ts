@@ -1,5 +1,4 @@
 import { createTranscriberSignature } from "../../domain/ports/transcriber.js";
-import { chunkAudioFormat } from "../../shared/chunk-audio-format.js";
 import { ValidationError } from "../../shared/errors.js";
 import {
   assertOpenAIAudioChunkFitsUploadLimit,
@@ -34,7 +33,6 @@ interface OpenAITranscriptionBaseConfig {
   deployment: string | null;
   transcriberSignature: string;
   uploadLimitBytes: number;
-  chunkFormat: typeof chunkAudioFormat;
 }
 
 export interface OpenAITranscriptionOpenAIConfig extends OpenAITranscriptionBaseConfig {
@@ -121,6 +119,49 @@ function createOpenAITranscriptionSignature(input: {
   });
 }
 
+interface OpenAITranscriptionBackendConfig {
+  apiKey: string;
+  requestModel: string;
+  endpoint: string | null;
+  apiVersion: string | null;
+  deployment: string | null;
+}
+
+function resolveBackendConfig(
+  env: NodeJS.ProcessEnv,
+  backend: OpenAITranscriptionBackend,
+  model: OpenAITranscriptionModel,
+): OpenAITranscriptionBackendConfig {
+  if (backend === "openai") {
+    return {
+      apiKey: requireTrimmedValue(
+        env.OPENAI_API_KEY,
+        "OPENAI_API_KEY e obrigatoria quando OPENAI_TRANSCRIPTION_BACKEND=openai.",
+      ),
+      requestModel: model,
+      endpoint: null,
+      apiVersion: null,
+      deployment: null,
+    };
+  }
+
+  const deployment = normalizeOptionalValue(env.AZURE_OPENAI_DEPLOYMENT);
+
+  return {
+    apiKey: requireTrimmedValue(
+      env.AZURE_OPENAI_API_KEY,
+      "AZURE_OPENAI_API_KEY e obrigatoria quando OPENAI_TRANSCRIPTION_BACKEND=azure.",
+    ),
+    requestModel: deployment ?? model,
+    endpoint: normalizeEndpoint(env.AZURE_OPENAI_ENDPOINT),
+    apiVersion: requireTrimmedValue(
+      env.OPENAI_API_VERSION,
+      "OPENAI_API_VERSION e obrigatoria quando OPENAI_TRANSCRIPTION_BACKEND=azure.",
+    ),
+    deployment,
+  };
+}
+
 export function createOpenAITranscriptionConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): OpenAITranscriptionConfig {
@@ -129,75 +170,36 @@ export function createOpenAITranscriptionConfig(
   const language = normalizeOptionalValue(env.OPENAI_TRANSCRIPTION_LANGUAGE, (value) => value.toLowerCase());
   const prompt = normalizeOptionalValue(env.OPENAI_TRANSCRIPTION_PROMPT);
 
-  if (backend === "openai") {
-    const apiKey = requireTrimmedValue(
-      env.OPENAI_API_KEY,
-      "OPENAI_API_KEY e obrigatoria quando OPENAI_TRANSCRIPTION_BACKEND=openai.",
-    );
-
-    return {
-      provider: OPENAI_TRANSCRIPTION_PROVIDER,
-      backend,
-      apiKey,
-      model,
-      requestModel: model,
-      responseFormat: OPENAI_TRANSCRIPTION_RESPONSE_FORMAT,
-      language,
-      prompt,
-      endpoint: null,
-      apiVersion: null,
-      deployment: null,
-      transcriberSignature: createOpenAITranscriptionSignature({
-        backend,
-        model,
-        responseFormat: OPENAI_TRANSCRIPTION_RESPONSE_FORMAT,
-        language,
-        prompt,
-        endpoint: null,
-        apiVersion: null,
-        deployment: null,
-      }),
-      uploadLimitBytes: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES,
-      chunkFormat: chunkAudioFormat,
-    };
-  }
-
-  const apiKey = requireTrimmedValue(
-    env.AZURE_OPENAI_API_KEY,
-    "AZURE_OPENAI_API_KEY e obrigatoria quando OPENAI_TRANSCRIPTION_BACKEND=azure.",
-  );
-  const endpoint = normalizeEndpoint(env.AZURE_OPENAI_ENDPOINT);
-  const apiVersion = requireTrimmedValue(
-    env.OPENAI_API_VERSION,
-    "OPENAI_API_VERSION e obrigatoria quando OPENAI_TRANSCRIPTION_BACKEND=azure.",
-  );
-  const deployment = normalizeOptionalValue(env.AZURE_OPENAI_DEPLOYMENT);
+  const backendConfig = resolveBackendConfig(env, backend, model);
 
   return {
     provider: OPENAI_TRANSCRIPTION_PROVIDER,
     backend,
-    apiKey,
+    apiKey: backendConfig.apiKey,
     model,
-    requestModel: deployment ?? model,
+    requestModel: backendConfig.requestModel,
     responseFormat: OPENAI_TRANSCRIPTION_RESPONSE_FORMAT,
     language,
     prompt,
-    endpoint,
-    apiVersion,
-    deployment,
+    endpoint: backendConfig.endpoint,
+    apiVersion: backendConfig.apiVersion,
+    deployment: backendConfig.deployment,
     transcriberSignature: createOpenAITranscriptionSignature({
       backend,
       model,
       responseFormat: OPENAI_TRANSCRIPTION_RESPONSE_FORMAT,
       language,
       prompt,
-      endpoint,
-      apiVersion,
-      deployment,
+      endpoint: backendConfig.endpoint,
+      apiVersion: backendConfig.apiVersion,
+      deployment: backendConfig.deployment,
     }),
     uploadLimitBytes: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES,
-    chunkFormat: chunkAudioFormat,
-  };
+    // TODO OPT: this `as` cast exists only because backendConfig.endpoint/apiVersion are
+    // `string | null` (not narrowed per backend), so this single literal can't be inferred
+    // as a discriminated-union member. Optional: make resolveBackendConfig return a union
+    // discriminated on `backend` to restore compile-time discriminant checking and drop the cast.
+  } as OpenAITranscriptionConfig;
 }
 
 export function assertChunkFitsUploadLimit(input: {

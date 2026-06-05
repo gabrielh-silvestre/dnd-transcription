@@ -9,8 +9,6 @@ export interface CodeWikiPaths {
   evidenceWorkflowsDir: string;
   pagesDir: string;
   reportsDir: string;
-  schemaPath: string;
-  refinementPlaybookPath: string;
   indexPath: string;
   evidenceIndexPath: string;
   refinedIndexPath: string;
@@ -32,8 +30,6 @@ export function resolveCodeWikiPaths(repoRoot: string, wikiRoot = DEFAULT_CODE_W
     evidenceWorkflowsDir: join(rootDir, "evidence", "workflows"),
     pagesDir: join(rootDir, "pages"),
     reportsDir: join(rootDir, "reports"),
-    schemaPath: join(rootDir, "schema.md"),
-    refinementPlaybookPath: join(rootDir, "refinement-playbook.md"),
     indexPath: join(rootDir, "index.md"),
     evidenceIndexPath: join(rootDir, "evidence", "index.md"),
     refinedIndexPath: join(rootDir, "pages", "index.md"),

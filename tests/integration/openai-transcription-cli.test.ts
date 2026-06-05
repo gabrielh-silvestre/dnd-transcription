@@ -1,40 +1,17 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import { runCli } from "../../src/cli/main.js";
 import { type OpenAITranscriptionConfig } from "../../src/infrastructure/providers/openai-transcription-config.js";
-import { FileJobStore } from "../../src/infrastructure/storage/file-job-store.js";
-import { resolveJobPaths } from "../../src/shared/paths.js";
-import { StubMediaSegmenter } from "../helpers/stub-media-segmenter.js";
+import {
+  buildCliArgs,
+  createFileJobStore,
+  createInputFixture,
+  createThreeChunkSegmenter,
+  extractChunkNumber,
+} from "../helpers/cli-harness.js";
 import { createTempDir } from "../helpers/temp-dir.js";
-
-function createSegmenter(): StubMediaSegmenter {
-  return new StubMediaSegmenter({
-    totalDurationMs: 180_000,
-    chunks: [
-      { index: 1, startMs: 0, endMs: 60_000 },
-      { index: 2, startMs: 60_000, endMs: 120_000 },
-      { index: 3, startMs: 120_000, endMs: 180_000 },
-    ],
-  });
-}
-
-async function createInputFixture(root: string): Promise<string> {
-  const inputPath = join(root, "input.mkv");
-  await writeFile(inputPath, "fixture", "utf8");
-  return inputPath;
-}
-
-function extractChunkNumber(audioPath: string): number {
-  const match = /(\d+)\.wav$/u.exec(audioPath);
-
-  if (match === null) {
-    throw new Error(`Nao foi possivel inferir chunk de ${audioPath}`);
-  }
-
-  return Number(match[1]);
-}
 
 describe("OpenAI transcription CLI", () => {
   describe("runCli integration", () => {
@@ -45,20 +22,7 @@ describe("OpenAI transcription CLI", () => {
       const capturedConfigs: OpenAITranscriptionConfig[] = [];
 
       const exitCode = await runCli(
-        [
-          "--input",
-          inputPath,
-          "--output",
-          outputDir,
-          "--chunk-duration-seconds",
-          "60",
-          "--concurrency",
-          "2",
-          "--provider",
-          "openai-transcription",
-          "--cleanup-policy",
-          "keep",
-        ],
+        buildCliArgs({ inputs: [inputPath], outputDir, provider: "openai-transcription" }),
         {
           env: {
             OPENAI_API_KEY: "sk-test",
@@ -66,8 +30,8 @@ describe("OpenAI transcription CLI", () => {
             OPENAI_TRANSCRIPTION_LANGUAGE: "pt",
             OPENAI_TRANSCRIPTION_PROMPT: "glossario",
           },
-          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-          createMediaSegmenter: () => createSegmenter(),
+          createJobStore: (dir) => createFileJobStore(dir),
+          createMediaSegmenter: () => createThreeChunkSegmenter(),
           createOpenAIAudioClient: (config) => {
             capturedConfigs.push(config as OpenAITranscriptionConfig);
 
@@ -109,20 +73,7 @@ describe("OpenAI transcription CLI", () => {
       let capturedConfig: OpenAITranscriptionConfig | undefined;
 
       const exitCode = await runCli(
-        [
-          "--input",
-          inputPath,
-          "--output",
-          outputDir,
-          "--chunk-duration-seconds",
-          "60",
-          "--concurrency",
-          "2",
-          "--provider",
-          "openai-transcription",
-          "--cleanup-policy",
-          "keep",
-        ],
+        buildCliArgs({ inputs: [inputPath], outputDir, provider: "openai-transcription" }),
         {
           env: {
             OPENAI_TRANSCRIPTION_BACKEND: "azure",
@@ -132,8 +83,8 @@ describe("OpenAI transcription CLI", () => {
             OPENAI_API_VERSION: "2025-03-01-preview",
             AZURE_OPENAI_DEPLOYMENT: "transcribe-prod",
           },
-          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-          createMediaSegmenter: () => createSegmenter(),
+          createJobStore: (dir) => createFileJobStore(dir),
+          createMediaSegmenter: () => createThreeChunkSegmenter(),
           createOpenAIAudioClient: (config) => {
             capturedConfig = config as OpenAITranscriptionConfig;
 
@@ -160,27 +111,14 @@ describe("OpenAI transcription CLI", () => {
       let transcribeCalls = 0;
 
       const firstRun = await runCli(
-        [
-          "--input",
-          inputPath,
-          "--output",
-          outputDir,
-          "--chunk-duration-seconds",
-          "60",
-          "--concurrency",
-          "2",
-          "--provider",
-          "openai-transcription",
-          "--cleanup-policy",
-          "keep",
-        ],
+        buildCliArgs({ inputs: [inputPath], outputDir, provider: "openai-transcription" }),
         {
           env: {
             OPENAI_API_KEY: "sk-test",
             OPENAI_TRANSCRIPTION_MODEL: "gpt-4o-mini-transcribe",
           },
-          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-          createMediaSegmenter: () => createSegmenter(),
+          createJobStore: (dir) => createFileJobStore(dir),
+          createMediaSegmenter: () => createThreeChunkSegmenter(),
           createOpenAIAudioClient: () => ({
             transcribe: async ({ audioPath }) => {
               transcribeCalls += 1;
@@ -195,21 +133,7 @@ describe("OpenAI transcription CLI", () => {
       transcribeCalls = 0;
 
       const resumedRun = await runCli(
-        [
-          "--input",
-          inputPath,
-          "--output",
-          outputDir,
-          "--chunk-duration-seconds",
-          "60",
-          "--concurrency",
-          "2",
-          "--provider",
-          "openai-transcription",
-          "--cleanup-policy",
-          "keep",
-          "--resume",
-        ],
+        buildCliArgs({ inputs: [inputPath], outputDir, provider: "openai-transcription", resume: true }),
         {
           env: {
             OPENAI_TRANSCRIPTION_BACKEND: "azure",
@@ -219,8 +143,8 @@ describe("OpenAI transcription CLI", () => {
             OPENAI_API_VERSION: "2025-03-01-preview",
             AZURE_OPENAI_DEPLOYMENT: "transcribe-prod",
           },
-          createJobStore: (dir) => new FileJobStore(resolveJobPaths(dir)),
-          createMediaSegmenter: () => createSegmenter(),
+          createJobStore: (dir) => createFileJobStore(dir),
+          createMediaSegmenter: () => createThreeChunkSegmenter(),
           createOpenAIAudioClient: () => ({
             transcribe: async ({ audioPath }) => {
               transcribeCalls += 1;

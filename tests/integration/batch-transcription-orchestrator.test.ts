@@ -3,44 +3,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import { runCli } from "../../src/cli/main.js";
-import { type TranscriptionRequest, type TranscriptionResult } from "../../src/domain/entities/transcription-result.js";
-import { createTranscriberSignature, type Transcriber } from "../../src/domain/ports/transcriber.js";
+import { createTranscriberSignature } from "../../src/domain/ports/transcriber.js";
 import { FileJobStore } from "../../src/infrastructure/storage/file-job-store.js";
 import { type Logger } from "../../src/shared/logger.js";
 import { deriveJobSubdir, resolveJobPaths } from "../../src/shared/paths.js";
+import { buildCliArgs, createThreeChunkSegmenter } from "../helpers/cli-harness.js";
+import { ControlledTranscriber } from "../helpers/controlled-transcriber.js";
 import { createTempDir } from "../helpers/temp-dir.js";
-import { StubMediaSegmenter } from "../helpers/stub-media-segmenter.js";
-
-class ControlledTranscriber implements Transcriber {
-  public readonly name = "fake";
-  public readonly signature: string;
-  private readonly failuresRemaining: Map<number, number>;
-
-  public constructor(
-    failuresRemaining: Record<number, number>,
-    signature = createTranscriberSignature({
-      provider: "fake",
-      variant: "controlled",
-    }),
-  ) {
-    this.failuresRemaining = new Map(Object.entries(failuresRemaining).map(([key, value]) => [Number(key), value]));
-    this.signature = signature;
-  }
-
-  public async transcribe(input: TranscriptionRequest): Promise<TranscriptionResult> {
-    const remaining = this.failuresRemaining.get(input.chunkIndex) ?? 0;
-
-    if (remaining > 0) {
-      this.failuresRemaining.set(input.chunkIndex, remaining - 1);
-      throw new Error(`falha planejada para chunk ${input.chunkIndex}`);
-    }
-
-    return {
-      chunkIndex: input.chunkIndex,
-      markdown: `Markdown do chunk ${input.chunkIndex}`,
-    };
-  }
-}
 
 interface CapturedLog {
   level: "info" | "warn" | "error";
@@ -64,17 +33,6 @@ function createCapturingLogger(): { logger: Logger; logs: CapturedLog[] } {
   };
 
   return { logger, logs };
-}
-
-function createSegmenter(): StubMediaSegmenter {
-  return new StubMediaSegmenter({
-    totalDurationMs: 180_000,
-    chunks: [
-      { index: 1, startMs: 0, endMs: 60_000 },
-      { index: 2, startMs: 60_000, endMs: 120_000 },
-      { index: 3, startMs: 120_000, endMs: 180_000 },
-    ],
-  });
 }
 
 async function createInputFixture(root: string, name: string): Promise<string> {
@@ -105,28 +63,13 @@ function buildArgs(options: {
   outputDir: string;
   resume?: boolean;
 }): string[] {
-  const args: string[] = [];
-  for (const input of options.inputs) {
-    args.push("--input", input);
-  }
-  args.push(
-    "--output",
-    options.outputDir,
-    "--chunk-duration-seconds",
-    "60",
-    "--concurrency",
-    "2",
-    "--file-concurrency",
-    "2",
-    "--provider",
-    "fake",
-    "--cleanup-policy",
-    "keep",
-  );
-  if (options.resume === true) {
-    args.push("--resume");
-  }
-  return args;
+  return buildCliArgs({
+    inputs: options.inputs,
+    outputDir: options.outputDir,
+    provider: "fake",
+    fileConcurrency: 2,
+    resume: options.resume,
+  });
 }
 
 describe("Batch transcription orchestrator", () => {
@@ -140,7 +83,7 @@ describe("Batch transcription orchestrator", () => {
     const failuresByPath: Record<string, Record<number, number>> = { [aAbs]: {}, [bAbs]: {}, [cAbs]: {} };
 
     const exitCode = await runCli(buildArgs({ inputs: [aAbs, bAbs, cAbs], outputDir }), {
-      createMediaSegmenter: () => createSegmenter(),
+      createMediaSegmenter: () => createThreeChunkSegmenter(),
       createTranscriber: (resolvedInputPath) => new ControlledTranscriber(failuresByPath[resolvedInputPath] ?? {}),
     });
 
@@ -201,7 +144,7 @@ describe("Batch transcription orchestrator", () => {
 
     const firstExit = await runCli(buildArgs({ inputs: [aAbs, bAbs, cAbs], outputDir }), {
       createLogger: () => first.logger,
-      createMediaSegmenter: () => createSegmenter(),
+      createMediaSegmenter: () => createThreeChunkSegmenter(),
       createTranscriber: (resolvedInputPath) =>
         new ControlledTranscriber(firstFailures[resolvedInputPath] ?? {}, signatureByPath[resolvedInputPath]),
     });
@@ -230,7 +173,7 @@ describe("Batch transcription orchestrator", () => {
     };
 
     const secondExit = await runCli(buildArgs({ inputs: [aAbs, bAbs, cAbs, dAbs], outputDir, resume: true }), {
-      createMediaSegmenter: () => createSegmenter(),
+      createMediaSegmenter: () => createThreeChunkSegmenter(),
       createTranscriber: (resolvedInputPath) =>
         new ControlledTranscriber(secondFailures[resolvedInputPath] ?? {}, signatureByPath[resolvedInputPath]),
     });
@@ -268,7 +211,7 @@ describe("Batch transcription orchestrator", () => {
     };
 
     const firstExit = await runCli(buildArgs({ inputs: [aAbs, bAbs, cAbs], outputDir }), {
-      createMediaSegmenter: () => createSegmenter(),
+      createMediaSegmenter: () => createThreeChunkSegmenter(),
       createTranscriber: (resolvedInputPath) =>
         new ControlledTranscriber({}, originalSignatures[resolvedInputPath]),
     });
@@ -290,7 +233,7 @@ describe("Batch transcription orchestrator", () => {
     };
 
     const secondExit = await runCli(buildArgs({ inputs: [aAbs, bAbs, cAbs], outputDir, resume: true }), {
-      createMediaSegmenter: () => createSegmenter(),
+      createMediaSegmenter: () => createThreeChunkSegmenter(),
       createTranscriber: (resolvedInputPath) =>
         new ControlledTranscriber({}, resumeSignatures[resolvedInputPath]),
     });
@@ -318,7 +261,7 @@ describe("Batch transcription orchestrator", () => {
 
     const exitCode = await runCli(buildArgs({ inputs: [aAbs], outputDir }), {
       createJobStore,
-      createMediaSegmenter: () => createSegmenter(),
+      createMediaSegmenter: () => createThreeChunkSegmenter(),
       createTranscriber: () => new ControlledTranscriber({}),
     });
 

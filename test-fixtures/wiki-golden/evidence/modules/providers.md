@@ -27,11 +27,4 @@ Provider configuration contributes to a stable `transcriberSignature` used by re
 
 ## Relevant files
 
-- `src/infrastructure/providers/AGENTS.md`
 - `src/infrastructure/providers/fake-transcriber.ts`
-- `src/infrastructure/providers/openai-audio-client.ts`
-- `src/infrastructure/providers/openai-audio-provider-shared.ts`
-- `src/infrastructure/providers/openai-audio-transcriber.ts`
-- `src/infrastructure/providers/openai-transcription-config.ts`
-- `src/infrastructure/providers/openai-whisper-config.ts`
-- `src/infrastructure/providers/openai-whisper-transcriber.ts`

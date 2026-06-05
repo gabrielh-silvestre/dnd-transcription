@@ -57,7 +57,7 @@ export function parseEnvFile(content: string): Record<string, string> {
       throw new Error(`Chave invalida em .env: ${key}`);
     }
 
-    let value = rawValue;
+    let value: string;
 
     if (rawValue.startsWith("\"") || rawValue.startsWith("'")) {
       value = parseQuotedValue(rawValue, rawValue[0] as "\"" | "'");

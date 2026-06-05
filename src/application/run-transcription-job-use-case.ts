@@ -92,7 +92,7 @@ export class RunTranscriptionJobUseCase {
         return this.buildResultFromState(currentState);
       }
 
-      currentState = await this.ensureRunningState(input, currentState);
+      currentState = await this.transitionToRunningIfNeeded(input, currentState);
 
       const manifest = await input.jobStore.readManifest();
       const pendingChunks = this.collectPendingChunks(currentState, manifest);
@@ -222,7 +222,7 @@ export class RunTranscriptionJobUseCase {
   private async prepareResume(
     input: RunTranscriptionJobUseCaseInput,
     compatibility: JobCompatibilitySnapshot,
-  ): Promise<JobState> {
+  ): Promise<void> {
     const existingState = await input.jobStore.readJobState();
     const existingJob = Job.restore(existingState);
     await input.jobStore.readManifest();
@@ -234,10 +234,11 @@ export class RunTranscriptionJobUseCase {
     }
 
     if (existingJob.status === "succeeded") {
-      return existingJob.toState();
+      return;
     }
 
-    return await input.jobStore.reconcileForResume();
+    await input.jobStore.reconcileForResume();
+    return;
   }
 
   private collectPendingChunks(state: JobState, manifest: ChunkManifest): ChunkManifestEntry[] {
@@ -285,7 +286,7 @@ export class RunTranscriptionJobUseCase {
     }
   }
 
-  private async ensureRunningState(
+  private async transitionToRunningIfNeeded(
     input: RunTranscriptionJobUseCaseInput,
     state: JobState,
   ): Promise<JobState> {

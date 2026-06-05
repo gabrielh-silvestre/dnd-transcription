@@ -20,12 +20,12 @@ This file is deterministic evidence generated from repository state. It is input
 
 ## Inventory counts
 
-- CLI files: 6
-- application files: 4
-- domain files: 11
-- infrastructure files: 20
-- provider files: 8
-- test files: 35
+- CLI files: 1
+- application files: 1
+- domain files: 1
+- infrastructure files: 2
+- provider files: 1
+- test files: 1
 
 ## Generated evidence to read next
 

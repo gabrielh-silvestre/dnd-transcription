@@ -13,7 +13,7 @@ This file is deterministic evidence for the repository's testing posture.
 
 ## Current shape
 
-- test files: 23
+- test files: 35
 
 ## Main test layers
 
@@ -30,16 +30,25 @@ This file is deterministic evidence for the repository's testing posture.
 
 ## Relevant files
 
+- `tests/AGENTS.md`
+- `tests/helpers/AGENTS.md`
+- `tests/helpers/cli-harness.ts`
+- `tests/helpers/controlled-transcriber.ts`
 - `tests/helpers/stub-media-segmenter.ts`
 - `tests/helpers/temp-dir.ts`
+- `tests/integration/AGENTS.md`
+- `tests/integration/batch-transcription-orchestrator.test.ts`
 - `tests/integration/ffmpeg-media-segmenter.test.ts`
 - `tests/integration/file-job-store.test.ts`
 - `tests/integration/openai-transcription-cli.test.ts`
 - `tests/integration/openai-whisper-cli.test.ts`
 - `tests/integration/transcription-orchestrator.test.ts`
+- `tests/setup/AGENTS.md`
 - `tests/setup/jest.setup.ts`
+- `tests/unit/AGENTS.md`
 - `tests/unit/chunk-manifest.test.ts`
 - `tests/unit/default-transcriber-binding-factory.test.ts`
+- `tests/unit/derive-job-subdir.test.ts`
 - `tests/unit/env-file.test.ts`
 - `tests/unit/job-persistence-mapper.test.ts`
 - `tests/unit/job.test.ts`
@@ -49,7 +58,10 @@ This file is deterministic evidence for the repository's testing posture.
 - `tests/unit/openai-whisper-transcriber.test.ts`
 - `tests/unit/parse-args.test.ts`
 - `tests/unit/resolve-cli-input-path.test.ts`
+- `tests/unit/run-batch-transcription-use-case.test.ts`
 - `tests/unit/task-pool.test.ts`
 - `tests/unit/transcription-cli-application.test.ts`
+- `tests/unit/wiki/AGENTS.md`
+- `tests/unit/wiki/code-wiki-golden.test.ts`
 - `tests/unit/wiki/code-wiki-service.test.ts`
 - `tests/unit/wiki/wiki-argument-parser.test.ts`
