@@ -1,6 +1,15 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 
+import { ValidationError } from "../../../src/shared/errors.js";
+import { type Logger } from "../../../src/shared/logger.js";
 import { WikiArgumentParser, WIKI_USAGE } from "../../../src/wiki/cli/wiki-argument-parser.js";
+import { runWikiCli } from "../../../src/wiki/cli/main.js";
+
+const silentLogger: Logger = {
+  info() {},
+  warn() {},
+  error() {},
+};
 
 describe("Wiki argument parser", () => {
   describe("parse", () => {
@@ -8,10 +17,13 @@ describe("Wiki argument parser", () => {
       const parser = new WikiArgumentParser();
       const result = parser.parse([]);
 
-      expect(result).toStrictEqual({
-        kind: "help",
-        text: WIKI_USAGE,
-      });
+      expect(result.kind).toBe("help");
+
+      if (result.kind !== "help") {
+        throw new Error("Resultado inesperado");
+      }
+
+      expect(result.text).toContain(WIKI_USAGE);
     });
 
     it("aceita ingest com multiplos sources e root customizado", () => {
@@ -56,6 +68,33 @@ describe("Wiki argument parser", () => {
       expect(() => {
         parser.parse(["ingest"]);
       }).toThrow(/ao menos um --source/);
+    });
+
+    it("lanca ValidationError para flag desconhecida em subcomando", () => {
+      const parser = new WikiArgumentParser();
+
+      expect(() => {
+        parser.parse(["ingest", "--bogus"]);
+      }).toThrow(ValidationError);
+    });
+  });
+
+  describe("runWikiCli", () => {
+    it("retorna 1 para erro dentro de subcomando sem chamar process.exit", async () => {
+      const exitSpy = jest.spyOn(process, "exit").mockImplementation(() => {
+        throw new Error("process.exit nao deve ser chamado");
+      });
+
+      try {
+        const exitCode = await runWikiCli(["ingest", "--bogus"], {
+          createLogger: () => silentLogger,
+        });
+
+        expect(exitCode).toBe(1);
+        expect(exitSpy).not.toHaveBeenCalled();
+      } finally {
+        exitSpy.mockRestore();
+      }
     });
   });
 });

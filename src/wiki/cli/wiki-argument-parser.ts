@@ -1,3 +1,5 @@
+import { Command, CommanderError, InvalidArgumentError } from "commander";
+
 import { ValidationError } from "../../shared/errors.js";
 import { DEFAULT_CODE_WIKI_ROOT } from "../shared/wiki-paths.js";
 
@@ -56,132 +58,135 @@ export type WikiCliParseResult =
   | WikiQueryCommand
   | WikiLintCommand;
 
-interface ParsedFlags {
-  values: Map<string, string[]>;
+interface RawWikiRootOptions {
+  root: string;
 }
 
-const supportedCommands = new Set(["init", "refresh", "ingest", "query", "lint"]);
-const supportedFlags = new Set(["--root", "--source", "--query", "--limit", "--help"]);
+interface RawWikiIngestOptions extends RawWikiRootOptions {
+  source: string[];
+}
+
+interface RawWikiQueryOptions extends RawWikiRootOptions {
+  query?: string;
+  limit: number;
+}
+
+function collectRepeatable(value: string, previous: string[]): string[] {
+  return previous.concat([value]);
+}
+
+function createPositiveIntegerParser(flag: string): (value: string) => number {
+  return (value) => {
+    const parsed = Number.parseInt(value, 10);
+
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new InvalidArgumentError(`Flag ${flag} deve ser um inteiro positivo.`);
+    }
+
+    return parsed;
+  };
+}
+
+function stripCommanderErrorPrefix(message: string): string {
+  return message.replace(/^error: /, "");
+}
 
 export class WikiArgumentParser {
   public parse(argv: string[]): WikiCliParseResult {
-    if (argv.length === 0 || argv.includes("--help")) {
-      return {
-        kind: "help",
-        text: WIKI_USAGE,
-      };
-    }
+    let helpText = "";
+    let captured: WikiCliParseResult | null = null;
 
-    const command = argv[0]?.trim();
-
-    if (command === undefined || command.length === 0 || !supportedCommands.has(command)) {
-      throw new ValidationError(`Comando wiki desconhecido: ${command ?? "<vazio>"}`, "wiki");
-    }
-
-    const flags = this.parseFlags(argv.slice(1));
-    const wikiRoot = this.readOptionalValue(flags, "--root") ?? DEFAULT_CODE_WIKI_ROOT;
-
-    if (command === "init") {
-      return { kind: "init", wikiRoot };
-    }
-
-    if (command === "refresh") {
-      return { kind: "refresh", wikiRoot };
-    }
-
-    if (command === "lint") {
-      return { kind: "lint", wikiRoot };
-    }
-
-    if (command === "ingest") {
-      const sourcePaths = this.readValues(flags, "--source");
-
-      if (sourcePaths.length === 0) {
-        throw new ValidationError("Comando ingest exige ao menos um --source.", "wiki");
-      }
-
-      return {
-        kind: "ingest",
-        wikiRoot,
-        sourcePaths,
-      };
-    }
-
-    const query = this.readOptionalValue(flags, "--query");
-
-    if (query === null || query.trim().length === 0) {
-      throw new ValidationError("Comando query exige --query com texto nao vazio.", "wiki");
-    }
-
-    return {
-      kind: "query",
-      wikiRoot,
-      query,
-      limit: this.readPositiveInteger(flags, "--limit") ?? 5,
+    const writeOut = (text: string): void => {
+      helpText += text;
     };
-  }
+    const writeErr = (): void => {};
 
-  private parseFlags(argv: readonly string[]): ParsedFlags {
-    const values = new Map<string, string[]>();
+    const program = new Command()
+      .name("wiki")
+      .exitOverride()
+      .configureOutput({ writeOut, writeErr })
+      .helpOption("--help", "exibe instrucoes de uso")
+      .addHelpText("after", WIKI_USAGE);
 
-    for (let index = 0; index < argv.length; index += 1) {
-      const token = argv[index]!;
+    program.helpCommand(false);
 
-      if (!token.startsWith("--")) {
-        throw new ValidationError(`Argumento inesperado: ${token}`, "wiki");
+    // exitOverride/configureOutput sao aplicados explicitamente em cada subcomando
+    // (alem do programa raiz) para garantir que nenhum caminho chame process.exit.
+    const registerSubcommand = (name: string, description: string): Command =>
+      program
+        .command(name)
+        .description(description)
+        .exitOverride()
+        .configureOutput({ writeOut, writeErr })
+        .helpOption("--help", "exibe instrucoes de uso")
+        .option("--root <diretorio>", "diretorio raiz do wiki", DEFAULT_CODE_WIKI_ROOT);
+
+    registerSubcommand("init", "cria a estrutura inicial do wiki").action(
+      (options: RawWikiRootOptions) => {
+        captured = { kind: "init", wikiRoot: options.root };
+      },
+    );
+
+    registerSubcommand("refresh", "regenera a evidencia do wiki").action(
+      (options: RawWikiRootOptions) => {
+        captured = { kind: "refresh", wikiRoot: options.root };
+      },
+    );
+
+    registerSubcommand("lint", "valida a saude do wiki").action(
+      (options: RawWikiRootOptions) => {
+        captured = { kind: "lint", wikiRoot: options.root };
+      },
+    );
+
+    registerSubcommand("ingest", "ingere fontes de codigo na evidencia do wiki")
+      .option("--source <caminho>", "fonte a ingerir (informe uma vez por fonte)", collectRepeatable, [])
+      .action((options: RawWikiIngestOptions) => {
+        if (options.source.length === 0) {
+          throw new ValidationError("Comando ingest exige ao menos um --source.", "wiki");
+        }
+
+        captured = { kind: "ingest", wikiRoot: options.root, sourcePaths: options.source };
+      });
+
+    registerSubcommand("query", "consulta paginas do wiki")
+      .option("--query <termos>", "termos de busca")
+      .option("--limit <n>", "limite de resultados", createPositiveIntegerParser("--limit"), 5)
+      .action((options: RawWikiQueryOptions) => {
+        const query = options.query;
+
+        if (query === undefined || query.trim().length === 0) {
+          throw new ValidationError("Comando query exige --query com texto nao vazio.", "wiki");
+        }
+
+        captured = { kind: "query", wikiRoot: options.root, query, limit: options.limit };
+      });
+
+    try {
+      // argv vazio segue o caminho de help (exit 0), como no parser anterior.
+      program.parse(argv.length === 0 ? ["--help"] : argv, { from: "user" });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
       }
 
-      const [flag, inlineValue] = token.split("=", 2);
+      if (error instanceof CommanderError) {
+        if (error.exitCode === 0) {
+          return { kind: "help", text: helpText };
+        }
 
-      if (!supportedFlags.has(flag)) {
-        throw new ValidationError(`Flag desconhecida: ${flag}`, "wiki");
+        throw new ValidationError(stripCommanderErrorPrefix(error.message), "wiki");
       }
 
-      const value = inlineValue ?? argv[index + 1];
-
-      if (value === undefined || value.startsWith("--")) {
-        throw new ValidationError(`Flag ${flag} exige um valor.`, "wiki");
-      }
-
-      if (inlineValue === undefined) {
-        index += 1;
-      }
-
-      const currentValues = values.get(flag) ?? [];
-      currentValues.push(value);
-      values.set(flag, currentValues);
+      throw error;
     }
 
-    return { values };
-  }
+    const result: WikiCliParseResult | null = captured;
 
-  private readValues(parsed: ParsedFlags, flag: string): string[] {
-    return parsed.values.get(flag) ?? [];
-  }
-
-  private readOptionalValue(parsed: ParsedFlags, flag: string): string | null {
-    const values = this.readValues(parsed, flag);
-
-    if (values.length === 0) {
-      return null;
+    if (result === null) {
+      throw new ValidationError(`Comando wiki desconhecido: ${argv[0] ?? "<vazio>"}`, "wiki");
     }
 
-    return values[values.length - 1] ?? null;
-  }
-
-  private readPositiveInteger(parsed: ParsedFlags, flag: string): number | null {
-    const rawValue = this.readOptionalValue(parsed, flag);
-
-    if (rawValue === null) {
-      return null;
-    }
-
-    const value = Number.parseInt(rawValue, 10);
-
-    if (!Number.isInteger(value) || value <= 0) {
-      throw new ValidationError(`Flag ${flag} deve ser um inteiro positivo.`, "wiki");
-    }
-
-    return value;
+    return result;
   }
 }
