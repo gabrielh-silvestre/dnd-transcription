@@ -104,3 +104,23 @@ Append-only record of code wiki maintenance operations.
 ## [2026-05-29] refresh | Code Wiki Refresh
 
 - Pages refreshed: `schema.md`, `refinement-playbook.md`, `evidence/overview.md`, `evidence/architecture.md`, `evidence/modules/cli.md`, `evidence/modules/application.md`, `evidence/modules/domain.md`, `evidence/modules/infrastructure.md`, `evidence/modules/providers.md`, `evidence/workflows/transcription-job.md`, `evidence/workflows/resume-semantics.md`, `evidence/testing.md`, `index.md`, `evidence/index.md`
+## [2026-06-05] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-06-05] ingest | src/cli, src/wiki/cli
+
+- Sources: `src/cli`, `src/wiki/cli`
+- pages updated: `schema.md`, `refinement-playbook.md`, `evidence/overview.md`, `evidence/architecture.md`, `evidence/modules/cli.md`, `evidence/workflows/transcription-job.md`, `index.md`, `evidence/index.md`
+## [2026-06-05] refine | CLI commander migration ADR
+
+- Added `pages/cli-commander-migration.md` documenting the commander@15 engine swap inside `CliArgumentParser`/`WikiArgumentParser` (plan `.omc/plans/commander-cli-migration.md`, Opção A) and the preserved invariants (flags, exit codes, types, seams).
+- Updated `pages/index.md` (Analyses section).
+## [2026-06-05] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
