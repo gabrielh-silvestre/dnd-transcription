@@ -71,6 +71,10 @@ interface RawWikiQueryOptions extends RawWikiRootOptions {
   limit: number;
 }
 
+// TODO OPT: collectRepeatable/createPositiveIntegerParser/stripCommanderErrorPrefix are
+// intentionally duplicated in src/cli/cli-argument-parser.ts to keep each CLI parser
+// self-contained (same isolation the pre-commander parsers had). Consolidate into a
+// shared helper module only if a third commander-based CLI appears.
 function collectRepeatable(value: string, previous: string[]): string[] {
   return previous.concat([value]);
 }
