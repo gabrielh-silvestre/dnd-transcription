@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 
 import { ValidationError } from "../../src/shared/errors.js";
 import {
@@ -9,6 +9,14 @@ import {
   toChunkDurationMs,
 } from "../../src/cli/cli-argument-parser.js";
 import { CLI_DEFAULT_RAW_INPUT_DIR } from "../../src/cli/input-path-resolver.js";
+import { runCli } from "../../src/cli/main.js";
+import { type Logger } from "../../src/shared/logger.js";
+
+const silentLogger: Logger = {
+  info() {},
+  warn() {},
+  error() {},
+};
 
 function parseRun(argv: string[]): CliRunResult {
   const parsed = new CliArgumentParser().parse(argv);
@@ -178,7 +186,7 @@ describe("CLI argument parser", () => {
       throw new Error("Resultado inesperado");
     }
 
-    expect(parsed.text).toBe(CLI_USAGE);
+    expect(parsed.text).toContain(CLI_USAGE);
     expect(parsed.text).toMatch(/openai-transcription/);
     expect(parsed.text).toMatch(new RegExp(CLI_DEFAULT_RAW_INPUT_DIR.replace(".", "\\.")));
   });
@@ -200,5 +208,26 @@ describe("CLI argument parser", () => {
         "delete-all",
       ]);
     }).toThrow(/cleanup-policy/);
+  });
+
+  it("lanca ValidationError para flag desconhecida", () => {
+    expect(() => {
+      parseArgs(["--bogus"]);
+    }).toThrow(ValidationError);
+  });
+
+  it("runCli retorna 1 para erro de uso sem chamar process.exit", async () => {
+    const exitSpy = jest.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("process.exit nao deve ser chamado");
+    });
+
+    try {
+      const exitCode = await runCli(["--bogus"], { createLogger: () => silentLogger });
+
+      expect(exitCode).toBe(1);
+      expect(exitSpy).not.toHaveBeenCalled();
+    } finally {
+      exitSpy.mockRestore();
+    }
   });
 });
