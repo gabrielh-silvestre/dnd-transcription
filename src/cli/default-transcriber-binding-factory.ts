@@ -1,88 +1,12 @@
-import { type CliOptions } from "./cli-argument-parser.js";
-import {
-  createFakeTranscriberSignature,
-  FakeTranscriber,
-  resolveFakeTranscriberOptions,
-} from "../infrastructure/providers/fake-transcriber.js";
-import { DefaultOpenAIAudioClient, type OpenAIAudioClient } from "../infrastructure/providers/openai-audio-client.js";
-import { assertOpenAIAudioChunkFitsUploadLimit } from "../infrastructure/providers/openai-audio-provider-shared.js";
-import { OpenAIAudioTranscriber } from "../infrastructure/providers/openai-audio-transcriber.js";
-import {
-  createOpenAITranscriptionConfig,
-  OPENAI_TRANSCRIPTION_PROVIDER,
-  type OpenAITranscriptionConfig,
-} from "../infrastructure/providers/openai-transcription-config.js";
-import {
-  createOpenAIWhisperConfig,
-  OPENAI_WHISPER_PROVIDER,
-  type OpenAIWhisperConfig,
-} from "../infrastructure/providers/openai-whisper-config.js";
-import { type TranscriberBinding } from "../domain/ports/transcriber-binding.js";
-import { type Transcriber } from "../domain/ports/transcriber.js";
-
-export type OpenAIProviderConfig = OpenAIWhisperConfig | OpenAITranscriptionConfig;
-
-export interface DefaultTranscriberBindingFactoryDependencies {
-  createOpenAIAudioClient?: (config: OpenAIProviderConfig) => OpenAIAudioClient;
-  env?: NodeJS.ProcessEnv;
-}
-
-export interface TranscriberBindingFactory {
-  create(options: CliOptions): TranscriberBinding;
-}
-
-export class DefaultTranscriberBindingFactory implements TranscriberBindingFactory {
-  public constructor(private readonly dependencies: DefaultTranscriberBindingFactoryDependencies = {}) {}
-
-  public create(options: CliOptions): TranscriberBinding {
-    const env = this.dependencies.env ?? process.env;
-
-    if (options.provider === "fake") {
-      return this.createFakeTranscriberBinding(env);
-    }
-
-    if (options.provider === OPENAI_WHISPER_PROVIDER) {
-      const config = createOpenAIWhisperConfig(env);
-      return this.createConfiguredOpenAITranscriberBinding(config, options);
-    }
-
-    if (options.provider === OPENAI_TRANSCRIPTION_PROVIDER) {
-      const config = createOpenAITranscriptionConfig(env);
-      return this.createConfiguredOpenAITranscriberBinding(config, options);
-    }
-
-    throw new Error(`Provedor '${options.provider}' nao esta implementado nesta V1.`);
-  }
-
-  private createConfiguredOpenAITranscriber(config: OpenAIProviderConfig): Transcriber {
-    const client = this.dependencies.createOpenAIAudioClient?.(config)
-      ?? new DefaultOpenAIAudioClient(config);
-
-    return new OpenAIAudioTranscriber(config, client);
-  }
-
-  private createConfiguredOpenAITranscriberBinding(
-    config: OpenAIProviderConfig,
-    options: CliOptions,
-  ): TranscriberBinding {
-    assertOpenAIAudioChunkFitsUploadLimit({
-      chunkDurationMs: options.chunkDurationMs,
-      uploadLimitBytes: config.uploadLimitBytes,
-      provider: config.provider,
-    });
-
-    return {
-      signature: config.transcriberSignature,
-      createTranscriber: () => this.createConfiguredOpenAITranscriber(config),
-    };
-  }
-
-  private createFakeTranscriberBinding(env: NodeJS.ProcessEnv): TranscriberBinding {
-    const options = resolveFakeTranscriberOptions(env);
-
-    return {
-      signature: createFakeTranscriberSignature(options),
-      createTranscriber: () => new FakeTranscriber(options),
-    };
-  }
-}
+/**
+ * Compatibility re-export. The binding factory now lives in `src/core/` so both
+ * the CLI and MCP gateways can construct transcriber bindings over the shared,
+ * framework-agnostic core (see plan: TRANSCRIBER-BINDING OWNERSHIP). The CLI
+ * keeps importing it from this path; the implementation is core-owned.
+ */
+export {
+  DefaultTranscriberBindingFactory,
+  type DefaultTranscriberBindingFactoryDependencies,
+  type OpenAIProviderConfig,
+  type TranscriberBindingFactory,
+} from "../core/default-transcriber-binding-factory.js";
