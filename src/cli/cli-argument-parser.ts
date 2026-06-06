@@ -1,5 +1,11 @@
-import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
+import { Command, CommanderError, Option } from "commander";
 
+import {
+  collectRejectingDashDash,
+  createPositiveIntegerParser,
+  createRejectDashDashParser,
+  translateCommanderError,
+} from "../shared/commander-helpers.js";
 import { ValidationError } from "../shared/errors.js";
 import { type CleanupPolicy } from "../shared/paths.js";
 import { CLI_DEFAULT_RAW_INPUT_DIR } from "./input-path-resolver.js";
@@ -54,26 +60,6 @@ export function toChunkDurationMs(chunkDurationSeconds: number): number {
   return chunkDurationSeconds * 1_000;
 }
 
-function collectRepeatable(value: string, previous: string[]): string[] {
-  return previous.concat([value]);
-}
-
-function createPositiveIntegerParser(flag: string): (value: string) => number {
-  return (value) => {
-    const parsed = Number.parseInt(value, 10);
-
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      throw new InvalidArgumentError(`Flag ${flag} deve ser um inteiro positivo.`);
-    }
-
-    return parsed;
-  };
-}
-
-function stripCommanderErrorPrefix(message: string): string {
-  return message.replace(/^error: /, "");
-}
-
 export class CliArgumentParser {
   parse(argv: string[]): CliParseResult {
     let helpText = "";
@@ -91,8 +77,13 @@ export class CliArgumentParser {
       .addHelpText("after", CLI_USAGE);
 
     program
-      .option("--input <arquivo>", "arquivo de entrada (informe uma vez por arquivo)", collectRepeatable, [])
-      .option("--output <diretorio>", "diretorio de saida do job")
+      .option(
+        "--input <arquivo>",
+        "arquivo de entrada (informe uma vez por arquivo)",
+        collectRejectingDashDash("--input"),
+        [],
+      )
+      .option("--output <diretorio>", "diretorio de saida do job", createRejectDashDashParser("--output"))
       .option(
         "--chunk-duration-seconds <segundos>",
         "duracao de cada chunk em segundos",
@@ -109,7 +100,7 @@ export class CliArgumentParser {
         createPositiveIntegerParser("--file-concurrency"),
         1,
       )
-      .option("--provider <provider>", "provider de transcricao")
+      .option("--provider <provider>", "provider de transcricao", createRejectDashDashParser("--provider"))
       .addOption(
         new Option("--cleanup-policy <politica>", "politica de limpeza dos chunks").choices([
           "on-success",
@@ -122,11 +113,13 @@ export class CliArgumentParser {
       program.parse(argv, { from: "user" });
     } catch (error) {
       if (error instanceof CommanderError) {
-        if (error.exitCode === 0) {
+        const translated = translateCommanderError(error);
+
+        if ("kind" in translated) {
           return { kind: "help", text: helpText };
         }
 
-        throw new ValidationError(stripCommanderErrorPrefix(error.message));
+        throw new ValidationError(translated.message);
       }
 
       throw error;

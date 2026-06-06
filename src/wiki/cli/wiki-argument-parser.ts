@@ -1,5 +1,11 @@
-import { Command, CommanderError, InvalidArgumentError } from "commander";
+import { Command, CommanderError } from "commander";
 
+import {
+  collectRejectingDashDash,
+  createPositiveIntegerParser,
+  createRejectDashDashParser,
+  translateCommanderError,
+} from "../../shared/commander-helpers.js";
 import { ValidationError } from "../../shared/errors.js";
 import { DEFAULT_CODE_WIKI_ROOT } from "../shared/wiki-paths.js";
 
@@ -71,39 +77,21 @@ interface RawWikiQueryOptions extends RawWikiRootOptions {
   limit: number;
 }
 
-// TODO OPT: collectRepeatable/createPositiveIntegerParser/stripCommanderErrorPrefix are
-// intentionally duplicated in src/cli/cli-argument-parser.ts to keep each CLI parser
-// self-contained (same isolation the pre-commander parsers had). Consolidate into a
-// shared helper module only if a third commander-based CLI appears.
-function collectRepeatable(value: string, previous: string[]): string[] {
-  return previous.concat([value]);
-}
-
-function createPositiveIntegerParser(flag: string): (value: string) => number {
-  return (value) => {
-    const parsed = Number.parseInt(value, 10);
-
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      throw new InvalidArgumentError(`Flag ${flag} deve ser um inteiro positivo.`);
-    }
-
-    return parsed;
-  };
-}
-
-function stripCommanderErrorPrefix(message: string): string {
-  return message.replace(/^error: /, "");
-}
-
 export class WikiArgumentParser {
   public parse(argv: string[]): WikiCliParseResult {
     let helpText = "";
+    let errText = "";
     let captured: WikiCliParseResult | null = null;
 
     const writeOut = (text: string): void => {
       helpText += text;
     };
-    const writeErr = (): void => {};
+    // O caso `wiki --` dispara commander.help e o commander escreve o help em
+    // writeErr (writeOut fica vazio). Acumular aqui (em vez de no-op) permite usar
+    // esse texto como fallback no ramo help; isso NAO vaza para o stderr real.
+    const writeErr = (text: string): void => {
+      errText += text;
+    };
 
     const program = new Command()
       .name("wiki")
@@ -123,7 +111,12 @@ export class WikiArgumentParser {
         .exitOverride()
         .configureOutput({ writeOut, writeErr })
         .helpOption("--help", "exibe instrucoes de uso")
-        .option("--root <diretorio>", "diretorio raiz do wiki", DEFAULT_CODE_WIKI_ROOT);
+        .option(
+          "--root <diretorio>",
+          "diretorio raiz do wiki",
+          createRejectDashDashParser("--root"),
+          DEFAULT_CODE_WIKI_ROOT,
+        );
 
     registerSubcommand("init", "cria a estrutura inicial do wiki").action(
       (options: RawWikiRootOptions) => {
@@ -144,7 +137,12 @@ export class WikiArgumentParser {
     );
 
     registerSubcommand("ingest", "ingere fontes de codigo na evidencia do wiki")
-      .option("--source <caminho>", "fonte a ingerir (informe uma vez por fonte)", collectRepeatable, [])
+      .option(
+        "--source <caminho>",
+        "fonte a ingerir (informe uma vez por fonte)",
+        collectRejectingDashDash("--source"),
+        [],
+      )
       .action((options: RawWikiIngestOptions) => {
         if (options.source.length === 0) {
           throw new ValidationError("Comando ingest exige ao menos um --source.", "wiki");
@@ -154,7 +152,7 @@ export class WikiArgumentParser {
       });
 
     registerSubcommand("query", "consulta paginas do wiki")
-      .option("--query <termos>", "termos de busca")
+      .option("--query <termos>", "termos de busca", createRejectDashDashParser("--query"))
       .option("--limit <n>", "limite de resultados", createPositiveIntegerParser("--limit"), 5)
       .action((options: RawWikiQueryOptions) => {
         const query = options.query;
@@ -175,21 +173,29 @@ export class WikiArgumentParser {
       }
 
       if (error instanceof CommanderError) {
-        if (error.exitCode === 0) {
-          return { kind: "help", text: helpText };
+        if (error.code === "commander.unknownCommand") {
+          const cmd = error.message.match(/unknown command '([^']+)'/)?.[1] ?? "<vazio>";
+
+          throw new ValidationError(`Comando wiki desconhecido: ${cmd}`, "wiki");
         }
 
-        throw new ValidationError(stripCommanderErrorPrefix(error.message), "wiki");
+        const translated = translateCommanderError(error);
+
+        if ("kind" in translated) {
+          return { kind: "help", text: helpText || errText };
+        }
+
+        throw new ValidationError(translated.message, "wiki");
       }
 
       throw error;
     }
 
-    const result: WikiCliParseResult | null = captured;
-
-    if (result === null) {
-      throw new ValidationError(`Comando wiki desconhecido: ${argv[0] ?? "<vazio>"}`, "wiki");
-    }
+    // Workaround de control-flow narrowing do TS: `captured` eh atribuido dentro das
+    // closures de .action(); apos um parse bem-sucedido toda rota valida passou por uma
+    // action, mas o TS estreita `captured` para `null` (nao reatribuido em caminho visivel),
+    // entao a assercao via `unknown` eh a forma minima que compila. NAO eh rede defensiva.
+    const result = captured as unknown as WikiCliParseResult;
 
     return result;
   }
