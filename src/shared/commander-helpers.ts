@@ -1,9 +1,5 @@
 import { CommanderError, InvalidArgumentError } from "commander";
 
-export function collectRepeatable(value: string, previous: string[]): string[] {
-  return previous.concat([value]);
-}
-
 export function createPositiveIntegerParser(flag: string): (value: string) => number {
   return (value) => {
     const parsed = Number.parseInt(value, 10);

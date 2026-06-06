@@ -5,7 +5,7 @@ import {
   type CodeWikiMutationResult,
   type CodeWikiQueryMatch,
 } from "../application/code-wiki-service.js";
-import { WikiArgumentParser, type WikiCliParseResult } from "./wiki-argument-parser.js";
+import { WikiArgumentParser } from "./wiki-argument-parser.js";
 
 export interface WikiCliDependencies {
   createLogger?: () => Logger;
