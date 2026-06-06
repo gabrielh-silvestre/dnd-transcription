@@ -64,7 +64,7 @@ midia (.mkv/.mp4/...)
 
 | Requisito | Detalhe | Como verificar |
 |-----------|---------|----------------|
-| **Node.js >= 22.12.0** | Exigido por `commander@15` (`package.json` → `engines`). O README ainda diz "20+", mas o `package.json` e a fonte autoritativa. | `node --version` |
+| **Node.js >= 22.12.0** | Exigido por `commander@15` (`package.json` → `engines`); o README e o `package.json` concordam em >=22.12.0, sendo o `package.json` a fonte autoritativa. | `node --version` |
 | **ffmpeg no PATH** | Usado para cortar os chunks. | `ffmpeg -version` |
 | **ffprobe no PATH** | Usado para medir a duracao. | `ffprobe -version` |
 | **Dependencias instaladas** | `commander`, `openai`. | `npm install` |
