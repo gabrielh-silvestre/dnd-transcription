@@ -1,4 +1,4 @@
-<!-- Generated: 2026-05-28 | Updated: 2026-05-28 -->
+<!-- Generated: 2026-05-28 | Updated: 2026-06-06 -->
 
 # dnd-transcription
 
@@ -8,7 +8,7 @@ TypeScript CLI that chunks long media files (e.g. multi-hour D&D session recordi
 ## Key Files
 | File | Description |
 |------|-------------|
-| `package.json` | Scripts (`build`, `test`, `transcribe`, `wiki`) and deps (`openai`, `jest`, `typescript`). ESM (`"type": "module"`). |
+| `package.json` | Scripts (`build`, `test`, `transcribe`, `wiki`); runtime deps (`commander`, `openai`); dev deps (`jest`, `typescript`). ESM (`"type": "module"`). Node `>=22.12.0`. |
 | `tsconfig.json` | TypeScript compiler config; emits to `dist/`. |
 | `jest.config.cjs` | Jest config; runs compiled tests from `dist/tests`, `testMatch **/*.test.js`, setup `dist/tests/setup/jest.setup.js`, 30s timeout, no transform. |
 | `README.md` | Human-facing project overview and usage. |
@@ -61,47 +61,45 @@ For cross-cutting, architectural, or history-sensitive questions, consult the co
 ## Dependencies
 
 ### External
+- `commander` (^15) — argv parsing engine behind both CLIs (`transcribe` + `wiki`); raises the minimum Node to `>=22.12.0`.
 - `openai` (^6.x) — Whisper / audio transcription client (also `AzureOpenAI`).
 - `typescript` (^5.8) — strict compilation, the primary correctness gate.
 - `jest` (^30) — test runner (run via `--experimental-vm-modules`).
 - `ffmpeg` / `ffprobe` — external CLIs for media segmentation (not npm; must be on PATH for real transcription, stubbed in tests).
 
-<!-- MANUAL: The section below is hand-authored agent-harness operating guidance (OMX v2). It is preserved across deepinit regenerations. -->
+<!-- MANUAL: The section below is hand-authored agent-harness operating guidance (oh-my-claudecode / OMC). It is preserved across deepinit regenerations. -->
 
-## OMX v2 operating model (preserved, harness-specific)
+## OMC operating model (preserved, harness-specific)
 
-You are working inside a repo that uses oh-my-codex v2.
+You are working inside a repo driven with oh-my-claudecode (OMC), a multi-agent orchestration layer for Claude Code. Skills are invoked as `/oh-my-claudecode:<name>`.
 
 ### Default operating model
-- Start from `$ultrawork` unless the user explicitly asks for a narrower workflow.
-- Route unclear or risky work through `$deep-interview`.
-- Turn broad work into durable slices with `$plan`.
-- Escalate to `$team` only when parallel durable execution is worth the overhead.
-- Keep `.omx/` honest. If the HUD says a mode is active, there should be artifacts or tasks proving it.
+- For broad or risky work, explore first then plan: route unclear requirements through `deep-interview`, and turn broad work into durable slices with `plan` / `ralplan`.
+- Use `ultrawork` for high-throughput parallel execution and `autopilot` / `ralph` for autonomous loops; narrow to a single agent when the task is small.
+- Escalate to `team` only when parallel durable execution is worth the coordination overhead.
+- Delegate specialized work to the right agent instead of doing everything in the main thread; keep authoring and review in separate passes.
+- Keep `.omc/` honest. If a mode is active, there should be artifacts or tasks proving it.
 
 ### Durable artifacts
-Maintain these when relevant: `.omx/plans/*.md`, `.omx/research/*.md`, `.omx/logs/execution-ledger.md`, `.omx/memory/*.json`, `.omx/state/*-state.json`, `.omx/state/tasks.json`, `.omx/state/reviews.json`, `.omx/state/inbox.json`, `.omx/team/team.json`.
+Maintain these when relevant: `.omc/plans/*.md`, `.omc/research/*.md`, `.omc/specs/*.md`, `.omc/handoffs/*.md`, `.omc/logs/`, `.omc/state/` (incl. `.omc/state/sessions/{sessionId}/`), `.omc/notepad.md`, `.omc/project-memory.json`. A legacy `.omx/` tree from a previous Codex-based harness still exists as read-only history; note `.omx/plans/` is also a code-wiki ingest source (see the code wiki contract in `CLAUDE.md`).
 
 ### Agent roles
-- `architect`: boundaries, risks, sequencing
+- `architect`: boundaries, risks, sequencing (read-only)
 - `planner`: execution slices, requirements, verification map
-- `researcher`: brownfield map, research summary, open questions
-- `executor`: one scoped slice, one explicit verify handoff
-- `reviewer`: findings first, coverage gaps, residual risk
-- `operator`: queue health, worker health, inbox clarity
+- `explore`: codebase search and file/pattern discovery
+- `executor`: one scoped slice of implementation (`model=opus` for complex work)
+- `code-reviewer` / `critic`: findings-first review, coverage gaps, residual risk
+- `verifier`: evidence-based completion checks before claiming done
+- `document-specialist`: SDK / framework / API docs lookup before implementing
 
-### Team runtime rules
-- Worker ids must map to real catalog roles.
-- Task claims must map to a real worker.
-- Every completion should generate a reviewable handoff.
-- Every review should end in `approved`, `changes_requested`, or stay `pending` for a clear reason.
-- Use inbox messages for next actions, not narration.
+### Verification and review rules
+- Verify before claiming completion; size the check to the risk (haiku → sonnet → opus for large/security work).
+- Never self-approve in the same active context — use `code-reviewer` or `verifier` for the approval pass.
+- Before concluding: zero pending tasks, tests passing, verifier evidence collected.
 
-### Plugin and hook rules
-- Prefer the first-party OMX plugin bundle when testing plugin flows.
-- Treat Codex hooks as experimental. Install them when useful, but keep degraded behavior correct when `codex_hooks` is off.
-- Repo-local hook installs belong in `<repo>/.codex/hooks.json`.
-- Personal hook installs belong in `~/.codex/hooks.json`.
+### Hooks and persistence
+- Hooks inject `<system-reminder>` tags; treat `[MAGIC KEYWORD: ...]` as an instruction to invoke the named skill, and `The boulder never stops` as ralph/ultrawork still active.
+- Kill switches: `DISABLE_OMC`, `OMC_SKIP_HOOKS`.
 
 ### Product boundary
-OMX v2 is Codex-native. Do not reintroduce `claude_code*` tools or the old Codex-to-Claude split unless the repo owner explicitly chooses to build an adapter later.
+This repo is now Claude-Code-native (OMC). The earlier oh-my-codex split (`.omx/`, `.codex/`) is legacy; do not reintroduce Codex-specific tooling unless the repo owner explicitly chooses to.

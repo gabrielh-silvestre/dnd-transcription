@@ -21,7 +21,6 @@ Home of the repo-local **code wiki** under `docs/wiki/` — the persistent docum
 | `pages/` | Durable refinement layer (LLM/human-authored synthesis). Edit here; keep `pages/index.md` current. |
 | `log.md` | Append-only mutation log written by wiki commands. |
 | `reports/` | Lint and other generated reports. |
-| `modules/`, `workflows/` | Additional generated content groupings. |
 
 ## For AI Agents
 

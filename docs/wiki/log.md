@@ -150,3 +150,13 @@ Append-only record of code wiki maintenance operations.
 - unindexed pages: 0
 - orphan pages: 0
 - broken links: 0
+## [2026-06-06] refine | multi-input batch coverage in architecture/boundaries/workflow pages
+
+- Updated: `pages/architecture.md`, `pages/module-boundaries.md`, `pages/transcription-job.md`
+- Added the multi-input batch layer (`RunBatchTranscriptionUseCase`) that the three 2026-04-20 pages omitted, verified against `src/application/run-batch-transcription-use-case.ts`, `src/infrastructure/storage/file-batch-index-writer.ts`, and `src/shared/paths.ts` (`deriveJobSubdir`): per-file `<slug>-<hash>/` subdirectories, `--file-concurrency` fan-out (soft warning when `fileConcurrency × concurrency > 16`), `batch-index.json` entries (`inputPath`, `subdir`, `exitCode`, `status`), and per-file `--resume` with aggregated exit codes. Refreshed `last_refined_on` and `source_paths` on all three pages.
+## [2026-06-06] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
