@@ -9,7 +9,14 @@
 // esbuild transpiles TypeScript without type-checking, so the full quality
 // gate is `npm run build && npm run build:bundle`.
 
+import { readFileSync } from "node:fs";
+
 import { build } from "esbuild";
+
+// Freeze the package.json version into the bundle. The standalone artifact runs
+// with no reachable package.json, so `--version` resolves __APP_VERSION__ from
+// this define instead of a runtime file read (see src/shared/app-version.ts).
+const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
 build({
   entryPoints: ["src/cli/main.ts"],
@@ -19,6 +26,8 @@ build({
   target: "node22", // align with engines.node >=22.12.0; do not down-level modern syntax
   outfile: "dist/bundle.js", // coexists with tsc output under dist/src/**; never replaces it
   logLevel: "warning", // surface dynamic-require / CJS->ESM interop warnings without failing the build
+  banner: { js: "#!/usr/bin/env node" }, // make the bundle directly executable (chmod +x dist/bundle.js)
+  define: { __APP_VERSION__: JSON.stringify(version) }, // build-time version for the standalone `--version`
 
   // Extension points (add only on demonstrated need):
   //   external: ["..."]      - force a dependency to stay un-bundled

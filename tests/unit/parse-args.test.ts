@@ -191,6 +191,18 @@ describe("CLI argument parser", () => {
     expect(parsed.text).toMatch(new RegExp(CLI_DEFAULT_RAW_INPUT_DIR.replace(".", "\\.")));
   });
 
+  it("retorna a versao quando solicitada", () => {
+    const parsed = parseArgs(["--version"]);
+
+    expect(parsed.kind).toBe("version");
+
+    if (parsed.kind !== "version") {
+      throw new Error("Resultado inesperado");
+    }
+
+    expect(parsed.text.trim()).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
   it("rejeita cleanup policy invalido", () => {
     expect(() => {
       parseArgs([

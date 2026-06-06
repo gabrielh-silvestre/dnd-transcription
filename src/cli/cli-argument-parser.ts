@@ -1,5 +1,6 @@
 import { Command, CommanderError, Option } from "commander";
 
+import { resolveAppVersion } from "../shared/app-version.js";
 import {
   collectRejectingDashDash,
   createPositiveIntegerParser,
@@ -38,12 +39,17 @@ export interface CliHelpResult {
   text: string;
 }
 
+export interface CliVersionResult {
+  kind: "version";
+  text: string;
+}
+
 export interface CliRunResult {
   kind: "run";
   options: CliOptions;
 }
 
-export type CliParseResult = CliHelpResult | CliRunResult;
+export type CliParseResult = CliHelpResult | CliVersionResult | CliRunResult;
 
 interface RawCliOptions {
   input: string[];
@@ -74,6 +80,7 @@ export class CliArgumentParser {
         writeErr: () => {},
       })
       .helpOption("--help", "exibe instrucoes de uso")
+      .version(resolveAppVersion(), "--version", "exibe a versao")
       .addHelpText("after", CLI_USAGE);
 
     program
@@ -116,7 +123,9 @@ export class CliArgumentParser {
         const translated = translateCommanderError(error);
 
         if ("kind" in translated) {
-          return { kind: "help", text: helpText };
+          return translated.kind === "version"
+            ? { kind: "version", text: helpText }
+            : { kind: "help", text: helpText };
         }
 
         throw new ValidationError(translated.message);
