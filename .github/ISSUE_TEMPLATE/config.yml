@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Runbook de operação
+    url: https://github.com/gabrielh-silvestre/dnd-transcription/blob/main/docs/runbook.md
+    about: Procedimentos, exit codes, troubleshooting e recuperação — consulte antes de abrir uma issue operacional.
