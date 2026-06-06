@@ -140,3 +140,13 @@ Append-only record of code wiki maintenance operations.
 - unindexed pages: 0
 - orphan pages: 0
 - broken links: 0
+## [2026-06-06] refine | resume semantics — running state + CLI resume nuance
+
+- Updated: `pages/resume-semantics.md`
+- Corrected two claims, verified against raw code and validated end-to-end with the `fake` provider (see `docs/runbook.md` P6): (1) `running` is a resumable state — `prepareResume` in `src/application/run-transcription-job-use-case.ts` rejects only `created`/`segmenting`/`fatal_error`, so a job interrupted mid-transcription resumes; (2) via the CLI, `--resume` without persisted artifacts starts a clean job rather than failing, because `RunBatchTranscriptionUseCase` derives `effectiveResume = resume && hasPersistedJobArtifacts` (the isolated use case still fails fast). Added `src/application/run-batch-transcription-use-case.ts` to source_paths.
+## [2026-06-06] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
