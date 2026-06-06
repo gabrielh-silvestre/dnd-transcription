@@ -1,3 +1,11 @@
+import { Command, CommanderError, Option } from "commander";
+
+import {
+  collectRejectingDashDash,
+  createPositiveIntegerParser,
+  createRejectDashDashParser,
+  translateCommanderError,
+} from "../shared/commander-helpers.js";
 import { ValidationError } from "../shared/errors.js";
 import { type CleanupPolicy } from "../shared/paths.js";
 import { CLI_DEFAULT_RAW_INPUT_DIR } from "./input-path-resolver.js";
@@ -37,21 +45,15 @@ export interface CliRunResult {
 
 export type CliParseResult = CliHelpResult | CliRunResult;
 
-const supportedFlags = new Set([
-  "--input",
-  "--output",
-  "--chunk-duration-seconds",
-  "--concurrency",
-  "--file-concurrency",
-  "--provider",
-  "--cleanup-policy",
-  "--resume",
-  "--help",
-]);
-
-interface ParsedFlagArguments {
-  flags: Map<string, string | boolean>;
-  inputPaths: string[];
+interface RawCliOptions {
+  input: string[];
+  output?: string;
+  chunkDurationSeconds?: number;
+  concurrency?: number;
+  fileConcurrency: number;
+  provider?: string;
+  cleanupPolicy?: CleanupPolicy;
+  resume: boolean;
 }
 
 export function toChunkDurationMs(chunkDurationSeconds: number): number {
@@ -60,117 +62,112 @@ export function toChunkDurationMs(chunkDurationSeconds: number): number {
 
 export class CliArgumentParser {
   parse(argv: string[]): CliParseResult {
-    const { flags, inputPaths } = this.parseFlagArguments(argv);
+    let helpText = "";
 
-    if (flags.get("--help") === true) {
-      return {
-        kind: "help",
-        text: CLI_USAGE,
-      };
+    const program = new Command()
+      .name("transcribe")
+      .exitOverride()
+      .configureOutput({
+        writeOut: (text) => {
+          helpText += text;
+        },
+        writeErr: () => {},
+      })
+      .helpOption("--help", "exibe instrucoes de uso")
+      .addHelpText("after", CLI_USAGE);
+
+    program
+      .option(
+        "--input <arquivo>",
+        "arquivo de entrada (informe uma vez por arquivo)",
+        collectRejectingDashDash("--input"),
+        [],
+      )
+      .option("--output <diretorio>", "diretorio de saida do job", createRejectDashDashParser("--output"))
+      .option(
+        "--chunk-duration-seconds <segundos>",
+        "duracao de cada chunk em segundos",
+        createPositiveIntegerParser("--chunk-duration-seconds"),
+      )
+      .option(
+        "--concurrency <n>",
+        "transcricoes simultaneas por arquivo",
+        createPositiveIntegerParser("--concurrency"),
+      )
+      .option(
+        "--file-concurrency <n>",
+        "arquivos processados em paralelo",
+        createPositiveIntegerParser("--file-concurrency"),
+        1,
+      )
+      .option("--provider <provider>", "provider de transcricao", createRejectDashDashParser("--provider"))
+      .addOption(
+        new Option("--cleanup-policy <politica>", "politica de limpeza dos chunks").choices([
+          "on-success",
+          "keep",
+        ]),
+      )
+      .option("--resume", "retoma um job existente a partir do estado persistido", false);
+
+    try {
+      program.parse(argv, { from: "user" });
+    } catch (error) {
+      if (error instanceof CommanderError) {
+        const translated = translateCommanderError(error);
+
+        if ("kind" in translated) {
+          return { kind: "help", text: helpText };
+        }
+
+        throw new ValidationError(translated.message);
+      }
+
+      throw error;
     }
 
-    if (inputPaths.length === 0) {
+    return { kind: "run", options: this.toCliOptions(program.opts<RawCliOptions>()) };
+  }
+
+  private toCliOptions(raw: RawCliOptions): CliOptions {
+    if (raw.input.length === 0) {
       throw new ValidationError("Flag obrigatoria ausente: --input");
     }
 
-    const cleanupPolicy = this.requireString(flags, "--cleanup-policy");
+    const cleanupPolicy = raw.cleanupPolicy;
 
-    if (cleanupPolicy !== "on-success" && cleanupPolicy !== "keep") {
-      throw new ValidationError("Flag --cleanup-policy deve ser 'on-success' ou 'keep'.");
+    if (cleanupPolicy === undefined) {
+      throw new ValidationError("Flag obrigatoria ausente: --cleanup-policy");
     }
 
-    const chunkDurationSeconds = this.requirePositiveInteger(flags, "--chunk-duration-seconds");
+    const chunkDurationSeconds = this.requirePresent(raw.chunkDurationSeconds, "--chunk-duration-seconds");
 
     return {
-      kind: "run",
-      options: {
-        inputPaths,
-        outputDir: this.requireString(flags, "--output"),
-        chunkDurationSeconds,
-        chunkDurationMs: toChunkDurationMs(chunkDurationSeconds),
-        concurrency: this.requirePositiveInteger(flags, "--concurrency"),
-        fileConcurrency: this.optionalPositiveInteger(flags, "--file-concurrency", 1),
-        provider: this.requireString(flags, "--provider"),
-        cleanupPolicy,
-        resume: flags.get("--resume") === true,
-      },
+      inputPaths: raw.input,
+      outputDir: this.requireNonEmptyString(raw.output, "--output"),
+      chunkDurationSeconds,
+      chunkDurationMs: toChunkDurationMs(chunkDurationSeconds),
+      concurrency: this.requirePresent(raw.concurrency, "--concurrency"),
+      fileConcurrency: raw.fileConcurrency,
+      provider: this.requireNonEmptyString(raw.provider, "--provider"),
+      cleanupPolicy,
+      resume: raw.resume,
     };
   }
 
-  private parseFlagArguments(argv: string[]): ParsedFlagArguments {
-    const flags = new Map<string, string | boolean>();
-    const inputPaths: string[] = [];
-
-    for (let index = 0; index < argv.length; index += 1) {
-      const token = argv[index]!;
-
-      if (!token.startsWith("--")) {
-        throw new ValidationError(`Argumento inesperado: ${token}`);
-      }
-
-      const [rawFlag, inlineValue] = token.split("=", 2);
-
-      if (!supportedFlags.has(rawFlag)) {
-        throw new ValidationError(`Flag desconhecida: ${rawFlag}`);
-      }
-
-      if (rawFlag === "--resume" || rawFlag === "--help") {
-        flags.set(rawFlag, true);
-        continue;
-      }
-
-      const value = inlineValue ?? argv[index + 1];
-
-      if (value === undefined || value.startsWith("--")) {
-        throw new ValidationError(`Flag ${rawFlag} exige um valor.`);
-      }
-
-      if (inlineValue === undefined) {
-        index += 1;
-      }
-
-      if (rawFlag === "--input") {
-        inputPaths.push(value);
-        continue;
-      }
-
-      flags.set(rawFlag, value);
-    }
-
-    return { flags, inputPaths };
-  }
-
-  private requireString(parsed: Map<string, string | boolean>, flag: string): string {
-    const value = parsed.get(flag);
-
-    if (typeof value !== "string" || value.trim().length === 0) {
+  private requireNonEmptyString(value: string | undefined, flag: string): string {
+    if (value === undefined || value.trim().length === 0) {
       throw new ValidationError(`Flag obrigatoria ausente: ${flag}`);
     }
 
     return value;
   }
 
-  private requirePositiveInteger(parsed: Map<string, string | boolean>, flag: string): number {
-    const rawValue = this.requireString(parsed, flag);
-    const value = Number.parseInt(rawValue, 10);
-
-    if (!Number.isInteger(value) || value <= 0) {
-      throw new ValidationError(`Flag ${flag} deve ser um inteiro positivo.`);
+  private requirePresent(value: number | undefined, flag: string): number {
+    if (value === undefined) {
+      throw new ValidationError(`Flag obrigatoria ausente: ${flag}`);
     }
 
     return value;
-  }
-
-  private optionalPositiveInteger(
-    parsed: Map<string, string | boolean>,
-    flag: string,
-    fallback: number,
-  ): number {
-    if (!parsed.has(flag)) {
-      return fallback;
-    }
-
-    return this.requirePositiveInteger(parsed, flag);
   }
 }
 

@@ -2,9 +2,11 @@
 
 CLI em TypeScript para fracionar arquivos `.mkv` longos em chunks `.wav`, transcrever os chunks em paralelo por meio de uma porta `Transcriber` substituivel e consolidar a saida em markdown ordenado cronologicamente.
 
+> **Operacao:** para um runbook passo a passo (procedimentos, exit codes, troubleshooting e recuperacao), veja [`docs/runbook.md`](./docs/runbook.md).
+
 ## Requisitos
 
-- Node.js 20+
+- Node.js >=22.12.0 (exigido pelo `commander@15`; ver `package.json` -> `engines`)
 - `ffmpeg` e `ffprobe` disponiveis no `PATH`
 
 ## Diretorio de entrada recomendado

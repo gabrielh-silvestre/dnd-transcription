@@ -10,6 +10,7 @@
 - The main OO refactor is complete: the canonical layers are `src/cli/`, `src/application/`, `src/domain/`, and `src/infrastructure/`.
 - The repo-local code wiki was bootstrapped on 2026-04-20 and should now be treated as the persistent documentation layer for the codebase.
 - The default automated test runner is now Jest over compiled artifacts in `dist/tests`.
+- Since 2026-06-05 both CLIs (`transcribe` and `wiki`) parse argv with `commander@^15` encapsulated inside the legacy parser classes; flags, exit codes, public types, and DI seams are unchanged (see `docs/wiki/pages/cli-commander-migration.md`).
 - `CLAUDE.md`, `AGENTS.md`, and `README.md` point to `docs/wiki/` as part of the navigation flow.
 
 ## What to read first next time

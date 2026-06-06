@@ -19,6 +19,7 @@ This file is **LLM-maintained**. The deterministic wiki pipeline may create it i
 ## Analyses
 
 - [Testing Strategy](./testing-strategy.md): How the suite protects schemas, exit codes, resume behavior, provider adapters, and wiki tooling.
+- [CLI on Commander (ADR)](./cli-commander-migration.md): Why both CLIs parse argv with commander@15 behind the legacy parser classes, and which invariants the swap preserved.
 
 ## Open Questions
 

@@ -104,3 +104,49 @@ Append-only record of code wiki maintenance operations.
 ## [2026-05-29] refresh | Code Wiki Refresh
 
 - Pages refreshed: `schema.md`, `refinement-playbook.md`, `evidence/overview.md`, `evidence/architecture.md`, `evidence/modules/cli.md`, `evidence/modules/application.md`, `evidence/modules/domain.md`, `evidence/modules/infrastructure.md`, `evidence/modules/providers.md`, `evidence/workflows/transcription-job.md`, `evidence/workflows/resume-semantics.md`, `evidence/testing.md`, `index.md`, `evidence/index.md`
+## [2026-06-05] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-06-05] ingest | src/cli, src/wiki/cli
+
+- Sources: `src/cli`, `src/wiki/cli`
+- pages updated: `schema.md`, `refinement-playbook.md`, `evidence/overview.md`, `evidence/architecture.md`, `evidence/modules/cli.md`, `evidence/workflows/transcription-job.md`, `index.md`, `evidence/index.md`
+## [2026-06-05] refine | CLI commander migration ADR
+
+- Added `pages/cli-commander-migration.md` documenting the commander@15 engine swap inside `CliArgumentParser`/`WikiArgumentParser` (plan `.omc/plans/commander-cli-migration.md`, Opção A) and the preserved invariants (flags, exit codes, types, seams).
+- Updated `pages/index.md` (Analyses section).
+## [2026-06-05] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-06-05] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-06-05] refine | ADR correction — commander error discrimination (C3-07)
+
+- Updated: `pages/cli-commander-migration.md`
+- Corrected error discrimination from `CommanderError.exitCode` to `error.code` (semantic string field); both `commander.help` and `commander.helpDisplayed` treated as help. Documented that Portuguese messages are re-translated by `translateCommanderError` in `src/shared/commander-helpers.ts` (not preserved automatically), using category tables `INTEGER_FLAGS`/`STRING_VALUE_FLAGS` because `commander@15` does not expose `error.cause`/`nestedError`. Added: Node 22.12.0 requirement with `.nvmrc` safeguard and accepted CI risk; error precedence change (C3-05); `--` rejected on all string flags via composed argParsers; `commander.unknownCommand` handled in wiki parser only. Test count noted as pre-adjustment baseline (lead reconfirms after C3-08).
+## [2026-06-05] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-06-06] refine | resume semantics — running state + CLI resume nuance
+
+- Updated: `pages/resume-semantics.md`
+- Corrected two claims, verified against raw code and validated end-to-end with the `fake` provider (see `docs/runbook.md` P6): (1) `running` is a resumable state — `prepareResume` in `src/application/run-transcription-job-use-case.ts` rejects only `created`/`segmenting`/`fatal_error`, so a job interrupted mid-transcription resumes; (2) via the CLI, `--resume` without persisted artifacts starts a clean job rather than failing, because `RunBatchTranscriptionUseCase` derives `effectiveResume = resume && hasPersistedJobArtifacts` (the isolated use case still fails fast). Added `src/application/run-batch-transcription-use-case.ts` to source_paths.
+## [2026-06-06] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
