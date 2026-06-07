@@ -179,6 +179,58 @@ npm run transcribe -- \
   --resume
 ```
 
+---
+
+## Servidor MCP (Model Context Protocol)
+
+Alem da CLI, o mesmo nucleo de transcricao e exposto como um **servidor MCP** via stdio, permitindo que um cliente LLM dispare transcricoes como _tools_. A CLI e o servidor MCP sao **gateways irmas** sobre o nucleo compartilhado (`src/core/`) — nenhuma das duas importa a outra, e o agente tira o mesmo proveito do script (N arquivos em paralelo, tamanho de chunk, concorrencia, cleanup, resume).
+
+### Como executar
+
+```bash
+# A partir do codigo (tsc):
+export MCP_TRANSCRIPTION_PROVIDER=openai-whisper
+export OPENAI_API_KEY=sk-...
+npm run mcp                       # node dist/src/mcp/main.js
+
+# Bundle standalone (sem node_modules):
+npm run build:bundle
+MCP_TRANSCRIPTION_PROVIDER=fake node dist/mcp-server.js
+```
+
+O servidor fala JSON-RPC **somente pelo stdout**; todo log vai para o stderr.
+
+### Configuracao de infra (por ambiente)
+
+`provider`, modelo, credenciais e backend **nunca** sao parametros de tool — sao lidos do ambiente e **validados no startup**: se a configuracao estiver invalida, o servidor sai com codigo != 0 **antes** de aceitar conexoes, em vez de falhar por chamada. `MCP_TRANSCRIPTION_PROVIDER` escolhe o provider; as demais variaveis sao exatamente as mesmas da CLI:
+
+| `MCP_TRANSCRIPTION_PROVIDER` | Variaveis |
+|------------------------------|-----------|
+| `fake` | nenhuma obrigatoria |
+| `openai-whisper` | `OPENAI_API_KEY` (+ `OPENAI_WHISPER_LANGUAGE` / `OPENAI_WHISPER_PROMPT` opcionais) |
+| `openai-transcription` | `OPENAI_TRANSCRIPTION_MODEL` + credenciais `openai`/`azure` (ver a secao do provider acima) |
+
+### Tools expostas
+
+- **`transcribe`** — parametros por chamada: `inputs` (>=1 caminho), `outputDir`, `chunkDurationSeconds`, `concurrency`, `fileConcurrency` (default 1), `cleanupPolicy` (`on-success`|`keep`), `resume` (default `false`). Retorna `structuredContent = { exitCode, fileResults }`; `exitCode != 0` marca `isError` para o agente se autocorrigir, com o detalhe por arquivo no texto.
+- **`transcription_health`** — sem argumentos. Retorna `{ provider, model, backend, ffmpegAvailable, ffprobeAvailable, serverVersion }`; nunca devolve segredos (`apiKey`/`endpoint`).
+
+### Exemplo de configuracao no cliente MCP
+
+```json
+{
+  "mcpServers": {
+    "dnd-transcription": {
+      "command": "node",
+      "args": ["dist/mcp-server.js"],
+      "env": { "MCP_TRANSCRIPTION_PROVIDER": "openai-whisper", "OPENAI_API_KEY": "sk-..." }
+    }
+  }
+}
+```
+
+> Arquitetura nucleo + gateways detalhada em [`docs/wiki/pages/mcp-gateway.md`](./docs/wiki/pages/mcp-gateway.md).
+
 ## Artefatos persistidos
 
 - `manifest.json`: manifesto ordenado por `index`, com `startMs`, `endMs` e `chunkPath`
@@ -198,9 +250,12 @@ npm run transcribe -- \
 
 ## Arquitetura final
 
+- `src/core/transcription-core.ts` e o nucleo framework-agnostico: `runTranscriptionCore` compoe o batch use case e devolve `{ exitCode, fileResults }`, sem parsear argv, carregar `.env`, validar diretorio, escrever no stdout, logar resumo ou engolir erros — isso fica nas gateways
+- A CLI e o servidor MCP sao **gateways irmas** sobre esse nucleo: `src/cli/` (argv -> exit code) e `src/mcp/` (JSON-RPC `tools/call` -> `CallToolResult`); nenhuma importa a outra
 - `src/cli/main.ts` e apenas o entrypoint Node e o wrapper programatico `runCli()`
-- `src/cli/transcription-cli-application.ts` concentra parse, help, carga de `.env`, composicao de dependencias e dispatch do caso de uso
-- `src/cli/default-transcriber-binding-factory.ts` resolve o provider default e cria `TranscriberBinding` lazy
+- `src/cli/transcription-cli-application.ts` concentra parse, help, carga de `.env`, composicao de dependencias e delega a execucao ao nucleo
+- `src/core/default-transcriber-binding-factory.ts` resolve o provider e cria `TranscriberBinding` lazy (re-exportado por `src/cli/` para compatibilidade)
+- `src/mcp/main.ts` resolve a infra do ambiente (fail-fast no startup, antes de `connect`) e conecta o `StdioServerTransport`; `src/mcp/server.ts` registra `transcribe` e `transcription_health`
 - `src/application/run-transcription-job-use-case.ts` orquestra bootstrap, `--resume`, transcricao paralela, merge e cleanup
 - `src/application/merge-transcripts-use-case.ts` consolida o markdown final a partir do manifesto persistido
 - `src/domain/entities/job.ts` e `src/domain/entities/job-chunk.ts` sao as fronteiras autoritativas do ciclo de vida do job
@@ -236,7 +291,9 @@ npm run transcribe -- \
 ## Scripts
 
 - `npm run build`
+- `npm run build:bundle` (bundles standalone `dist/bundle.js` da CLI e `dist/mcp-server.js` do MCP)
 - `npm run transcribe -- --input <file.mkv> --output <dir> --provider <provider>`
+- `npm run mcp` (servidor MCP via stdio; `provider`/credenciais por ambiente)
 - `npm run wiki -- <init|refresh|ingest|query|lint>`
 
 ## Code Wiki

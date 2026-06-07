@@ -8,7 +8,8 @@ This file is **LLM-maintained**. The deterministic wiki pipeline may create it i
 
 ## Modules
 
-- [Module Boundaries](./module-boundaries.md): Responsibility map for CLI, application, domain, and infrastructure, including the main dependency seams.
+- [Core + Gateways (CLI and MCP)](./mcp-gateway.md): The framework-agnostic `src/core` and the two sibling gateways (CLI + MCP stdio server), the MCP `transcribe`/`transcription_health` tool surface, the env-only infra/secrets boundary (R3), the no-CLI-import rule (R4), and the per-gateway error boundary.
+- [Module Boundaries](./module-boundaries.md): Responsibility map for core, the CLI and MCP gateways, application, domain, and infrastructure, including the main dependency seams.
 - [Provider Adapters](./provider-adapters.md): Provider matrix, stable signature rules, lazy client materialization, and upload-size guards.
 
 ## Workflows

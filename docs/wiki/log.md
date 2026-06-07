@@ -160,3 +160,20 @@ Append-only record of code wiki maintenance operations.
 - unindexed pages: 0
 - orphan pages: 0
 - broken links: 0
+## [2026-06-06] refine | core + gateways (CLI and MCP) architecture and MCP server
+
+- Added `pages/mcp-gateway.md` documenting the framework-agnostic `src/core` (`runTranscriptionCore`) and the two sibling gateways over it — the CLI (`src/cli`) and the new MCP stdio server (`src/mcp`) — from commits `cd2109d` (extract core) and `c802534` (MCP gateway). Covers the `transcribe`/`transcription_health` tools, the R2 per-call param surface, the R3 env-only infra/secrets boundary (`MCP_TRANSCRIPTION_PROVIDER`, fail-fast at startup before `connect`), the R4 no-CLI-import rule (SDK absent from `dist/bundle.js`, present in `dist/mcp-server.js`), stdout purity (stderr+buffer logger), and the error-boundary split (core never swallows; CLI → exit 1, MCP → `isError`). Verified against raw sources in `src/core/*`, `src/mcp/*`, `esbuild.config.mjs`, and `package.json`.
+- Updated `pages/architecture.md` and `pages/module-boundaries.md` to introduce the core layer and the two gateways (new `source_paths`, refreshed narrative and Related Pages). Updated `pages/index.md` (Modules section).
+- Note: the deterministic evidence generator (`code-wiki-page-definitions.ts`) maps only the original four layers, so there is no evidence page for `src/core`/`src/mcp` and a plain `ingest`/`refresh` will not create one — adding it needs new page definitions (a code change). This refined page is verified against raw sources directly.
+## [2026-06-06] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
+## [2026-06-06] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
