@@ -54,9 +54,13 @@ function extractFlag(message: string): string {
 
 export function translateCommanderError(
   error: CommanderError,
-): { kind: "help" } | { message: string } {
+): { kind: "help" | "version" } | { message: string } {
   if (error.code === "commander.help" || error.code === "commander.helpDisplayed") {
     return { kind: "help" };
+  }
+
+  if (error.code === "commander.version") {
+    return { kind: "version" };
   }
 
   if (error.code === "commander.unknownOption") {

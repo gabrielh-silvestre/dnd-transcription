@@ -9,17 +9,20 @@ source_paths:
   - "README.md"
   - "src/cli/transcription-cli-application.ts"
   - "src/application/run-transcription-job-use-case.ts"
+  - "src/application/run-batch-transcription-use-case.ts"
   - "src/application/merge-transcripts-use-case.ts"
   - "src/infrastructure/media/ffmpeg-media-segmenter.ts"
   - "src/infrastructure/storage/file-job-store.ts"
+  - "src/infrastructure/storage/file-batch-index-writer.ts"
+  - "src/shared/paths.ts"
   - "tests/integration/transcription-orchestrator.test.ts"
-last_refined_on: "2026-04-20"
+last_refined_on: "2026-06-06"
 ---
 # Transcription Job Workflow
 
 ## What It Covers
 
-This page documents the main execution path for a transcription run, from argument parsing to `transcript.md`, including how partial failure and cleanup behave.
+This page documents the main execution path for a transcription run, from argument parsing to `transcript.md`, including how partial failure and cleanup behave, and how multiple `--input` files fan out into a batch.
 
 ## How It Works
 
@@ -30,6 +33,15 @@ This page documents the main execution path for a transcription run, from argume
 5. When pending chunks exist, the workflow creates the real transcriber lazily and processes only pending manifest entries through the bounded task pool. Each chunk is marked `running`, transcribed, written to `transcripts/<chunk>.md`, then marked `succeeded` or `failed`.
 6. If any chunk remains failed, the job ends as `partial_failed` with exit code `2`. If every chunk succeeds, `MergeTranscriptsUseCase` reads persisted markdown files in manifest order and writes the consolidated `transcript.md`.
 7. After full success, `cleanup-policy=on-success` removes the intermediate WAV chunk files. Fatal exceptions try to mark the job as `fatal_error` and return exit code `1`.
+
+### Multi-input batches
+
+Passing `--input` two or more times switches the run into batch mode, handled by `RunBatchTranscriptionUseCase` above the single-file use case:
+
+- Each input becomes an independent job under its own `<output>/<slug>-<hash>/` subdirectory (`slug` = sanitized basename, `hash` = first 8 hex of the sha256 of the resolved absolute path, via `deriveJobSubdir`), so same-named files never collide. A single `--input` keeps the legacy flat `<output>/transcript.md`.
+- `--file-concurrency` (default 1) bounds how many files run in parallel; total in-flight provider calls ≈ `fileConcurrency × concurrency`, and the batch logs a soft (never fatal) warning when that product exceeds 16.
+- A `<output>/batch-index.json` (written only for N ≥ 2 by `FileBatchIndexWriter`) records one entry per input with `inputPath`, `subdir`, `exitCode`, and `status`.
+- `--resume` applies per file; exit codes aggregate as: any fatal file → `1`, otherwise any partial → `2`, otherwise `0`.
 
 ## Evidence
 

@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-05-28 | Updated: 2026-05-28 -->
+<!-- Generated: 2026-05-28 | Updated: 2026-06-06 -->
 
 # unit
 
@@ -20,6 +20,9 @@ Fast, isolated tests of single modules — domain entities, CLI/arg parsing, pat
 | `openai-transcription-config.test.ts` | OpenAI/Azure config builders; env parsing, defaults, signature generation. |
 | `openai-whisper-config.test.ts` | Whisper config creation and env validation. |
 | `openai-whisper-transcriber.test.ts` | Transcriber adapter; retry/backoff on 429, language/prompt passing. |
+| `commander-helpers.test.ts` | `translateCommanderError` error-code translation, `INTEGER_FLAGS` and `STRING_VALUE_FLAGS` sets. |
+| `derive-job-subdir.test.ts` | `deriveJobSubdir` from `src/shared/paths.ts`: determinism, uniqueness across paths, stability for same input. |
+| `run-batch-transcription-use-case.test.ts` | `RunBatchTranscriptionUseCase`: multi-file fan-out, `fileConcurrency` parallelism, batch-index aggregation, partial-failure propagation. |
 | `env-file.test.ts` | `.env` parsing and load semantics. |
 | `task-pool.test.ts` | Concurrent task pool: concurrency control and error handling. |
 

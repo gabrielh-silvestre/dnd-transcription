@@ -88,6 +88,56 @@ describe("Transcription CLI application", () => {
     expect(executions).toBe(0);
   });
 
+  it("retorna a versao sem carregar env nem executar o job", async () => {
+    let envLoads = 0;
+    let executions = 0;
+    let stdout = "";
+
+    const argumentParser: CliArgumentParserLike = {
+      parse() {
+        return {
+          kind: "version",
+          text: "9.9.9\n",
+        };
+      },
+    };
+
+    const application = new TranscriptionCliApplication(
+      {
+        createLogger: createSilentLogger,
+      },
+      {
+        argumentParser,
+        loadEnvFile: async () => {
+          envLoads += 1;
+          return {};
+        },
+        runTranscriptionJobUseCase: {
+          execute: async () => {
+            executions += 1;
+            return {
+              exitCode: 0,
+              jobStatus: "succeeded",
+              failedChunks: [],
+              finalMarkdownPath: null,
+              errorSummary: null,
+            };
+          },
+        },
+        writeStdout: (text) => {
+          stdout += text;
+        },
+      },
+    );
+
+    const exitCode = await application.run(["--version"]);
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("9.9.9\n");
+    expect(envLoads).toBe(0);
+    expect(executions).toBe(0);
+  });
+
   it("preserva o seam legado createTranscriber", async () => {
     const options = createCliOptions();
     const inputPathResolver: InputPathResolverLike = {

@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-05-28 | Updated: 2026-05-28 -->
+<!-- Generated: 2026-05-28 | Updated: 2026-06-06 -->
 
 # cli
 
@@ -10,7 +10,7 @@ The wiki subsystem's command-line interface: parses argv, dispatches to `CodeWik
 | File | Description |
 |------|-------------|
 | `main.ts` | Entrypoint; exports `runWikiCli(argv, dependencies)` and `main(argv)`; ESM-main detection; delegates to `WikiCliApplication.run()`. |
-| `wiki-argument-parser.ts` | `WikiArgumentParser.parse(argv)` → `WikiCliParseResult` union (Init/Refresh/Ingest/Query/Lint commands or Help); defines `WIKI_USAGE` and validates flags. |
+| `wiki-argument-parser.ts` | `WikiArgumentParser.parse(argv)` → `WikiCliParseResult` union (Init/Refresh/Ingest/Query/Lint commands or Help) via `commander` subcommands; defines `WIKI_USAGE` and validates flags. |
 | `wiki-cli-application.ts` | `WikiCliApplication.run(argv)` — orchestrates parse → dispatch → render; `renderMutationResult` / `renderQueryResult` / `renderLintResult`; error handling and exit codes. |
 
 ## For AI Agents
@@ -28,7 +28,7 @@ The wiki subsystem's command-line interface: parses argv, dispatches to `CodeWik
 ## Dependencies
 
 ### Internal
-`./wiki-argument-parser.ts`, `src/wiki/application/code-wiki-service.ts`, `src/wiki/shared/wiki-paths.ts` (`DEFAULT_CODE_WIKI_ROOT`), `src/shared/` (`createLogger`, `ValidationError`).
+`./wiki-argument-parser.ts`, `src/wiki/application/code-wiki-service.ts`, `src/wiki/shared/wiki-paths.ts` (`DEFAULT_CODE_WIKI_ROOT`), `src/shared/` (`createLogger`, `ValidationError`, `commander-helpers.ts`).
 
 ### External
-node `path` (`resolve`), `url` (`pathToFileURL`).
+node `path` (`resolve`), `url` (`pathToFileURL`); `commander`.

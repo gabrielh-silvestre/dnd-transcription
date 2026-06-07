@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-05-28 | Updated: 2026-05-28 -->
+<!-- Generated: 2026-05-28 | Updated: 2026-06-06 -->
 
 # cli
 
@@ -10,7 +10,7 @@ The left (driving) adapter of the hexagonal architecture and the transcription b
 | File | Description |
 |------|-------------|
 | `main.ts` | Node entrypoint; exports `main()` / `runCli()`, calls `TranscriptionCliApplication.run()` and sets `process.exitCode`. ESM-main detection via `pathToFileURL`. |
-| `cli-argument-parser.ts` | Parses argv into a `CliParseResult` (help vs run); validates `--input`, `--output`, `--chunk-duration-seconds`, `--concurrency`, `--provider`, `--cleanup-policy`, `--resume`; throws `ValidationError` on bad input. |
+| `cli-argument-parser.ts` | Parses argv into a `CliParseResult` (help vs run) via `commander`; validates `--input` (repeatable), `--output`, `--chunk-duration-seconds`, `--concurrency`, `--file-concurrency` (default 1), `--provider`, `--cleanup-policy`, `--resume`; throws `ValidationError` on bad input. |
 | `input-path-resolver.ts` | `InputPathResolver` / `resolveCliInputPath()`; resolves relative inputs against the default `.ignore/raw/` directory to absolute paths. |
 | `transcription-cli-application.ts` | Orchestrator. Accepts an injectable `CliDependencies` seam (job-store / segmenter / transcriber / logger factories), normalizes paths, wires the use case, runs it, returns the exit code. |
 | `default-transcriber-binding-factory.ts` | `DefaultTranscriberBindingFactory` implementing `TranscriberBindingFactory`; maps a provider string (`fake`, `openai-whisper`, `openai-transcription`) to a concrete `Transcriber`, building OpenAI config + client as needed. |
@@ -33,4 +33,4 @@ Covered by `tests/unit/parse-args.test.ts`, `resolve-cli-input-path.test.ts`, `d
 `src/application/run-transcription-job-use-case.ts`, `src/domain/ports/*`, `src/domain/entities/*`, `src/infrastructure/*` (FileJobStore, FFmpegMediaSegmenter, providers), `src/shared/*` (logger, errors, paths, env-file).
 
 ### External
-node `path`, `url` (`pathToFileURL`), `crypto` (`randomUUID`), `fs/promises` (`stat`); `openai` SDK (instantiated in the binding factory).
+node `path`, `url` (`pathToFileURL`), `crypto` (`randomUUID`), `fs/promises` (`stat`); `commander`; `openai` SDK (instantiated in the binding factory).

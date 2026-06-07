@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "node --input-type=module --eval \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.json",
+    "build:bundle": "node esbuild.config.mjs",
     "jest:run": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.config.cjs --runInBand",
     "test": "npm run build --silent && npm run jest:run",
     "test:unit": "npm run build --silent && npm run jest:run -- --testPathPatterns=dist/tests/unit/",
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "esbuild": "^0.28.0",
     "jest": "^30.3.0",
     "typescript": "^5.8.3"
   },

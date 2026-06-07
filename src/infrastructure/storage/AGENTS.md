@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-05-28 | Updated: 2026-05-28 -->
+<!-- Generated: 2026-05-28 | Updated: 2026-06-06 -->
 
 # storage
 
@@ -10,6 +10,7 @@ Job-state and chunk-manifest persistence. Implements the `JobStore` port over JS
 | File | Description |
 |------|-------------|
 | `file-job-store.ts` | `FileJobStore` (implements `JobStore`). Wraps the `Job` entity; serializes writes through a `mutationQueue`; implements init/manifest/state/chunk/markdown/cleanup operations by `restore()`-ing the Job, mutating, `touch()`-ing, and writing back the record. |
+| `file-batch-index-writer.ts` | `FileBatchIndexWriter` (implements `BatchIndexWriter`). Writes `batch-index.json` (shape `{ entries: [...] }`) in the output directory with one entry per input file (`inputPath`, `subdir`, `exitCode`, `status`). Used by `RunBatchTranscriptionUseCase` in multi-input mode. |
 | `chunk-manifest-record.ts` | `ChunkManifestRecord` / `ChunkManifestRecordEntry` — the persisted manifest JSON schema (version, createdAt, inputPath, chunkDurationMs, totalDurationMs, chunks[]). |
 | `job-state-record.ts` | `JobStateRecord` / `JobChunkStateRecord` / `JobCompatibilitySnapshotRecord` — the persisted job-state JSON schema, including the resume compatibility snapshot with `transcriberSignature`. |
 | `job-persistence-mapper.ts` | Pure mappers: `toChunkManifestRecord`/`fromChunkManifestRecord`, `toJobStateRecord`/`fromJobStateRecord`. Normalizes relative paths to POSIX, ISO timestamps, and sorts chunks by index for deterministic output. |

@@ -10,6 +10,7 @@ source_paths:
   - "package.json"
   - "src/cli/transcription-cli-application.ts"
   - "src/application/run-transcription-job-use-case.ts"
+  - "src/application/run-batch-transcription-use-case.ts"
   - "src/application/merge-transcripts-use-case.ts"
   - "src/domain/entities/job.ts"
   - "src/infrastructure/storage/file-job-store.ts"
@@ -20,7 +21,7 @@ source_paths:
   - "src/shared/paths.ts"
   - "src/shared/chunk-audio-format.ts"
   - "tests/integration/transcription-orchestrator.test.ts"
-last_refined_on: "2026-04-20"
+last_refined_on: "2026-06-06"
 ---
 # Architecture Overview
 
@@ -32,6 +33,7 @@ This page summarizes the stable layer map for the transcription CLI, the directi
 
 - `src/cli/` is the outer adapter. It parses argv, resolves the input path, short-circuits `--help`, loads `.env` without overwriting exported shell variables, and composes the concrete dependencies that the use case needs.
 - `src/application/` owns end-to-end workflow orchestration. `RunTranscriptionJobUseCase` decides whether the run is a new bootstrap or a `--resume`, drives chunk execution through the task pool, and decides whether the job ends in `succeeded`, `partial_failed`, or `fatal_error`.
+- Multi-input runs are orchestrated one level up by `RunBatchTranscriptionUseCase`: it fans out to one `RunTranscriptionJobUseCase` per file with bounded `fileConcurrency`, gives each file its own `<output>/<slug>-<hash>/` subdirectory plus a `batch-index.json`, and aggregates per-file exit codes into the batch exit code. A single `--input` keeps the legacy flat `<output>/transcript.md` layout.
 - `src/domain/` is the authoritative rule layer. `Job`, `JobChunk`, and `ChunkManifest` define allowed state transitions, exit-code derivation, and resume compatibility checks instead of letting adapters invent those rules independently.
 - `src/infrastructure/` implements the side-effecting ports. `FileJobStore` persists `manifest.json` and `job-state.json`, `FFmpegMediaSegmenter` normalizes chunks into WAV PCM 16-bit mono 16000 Hz, and the provider adapters isolate SDK-specific behavior.
 - The build and runtime entrypoints stay intentionally simple: `npm run build` clears `dist/` before `tsc`, and both `npm run transcribe` and `npm run wiki` execute the compiled CLI from `dist/`.

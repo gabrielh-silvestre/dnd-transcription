@@ -1,6 +1,6 @@
 # Shared Architecture Snapshot
 
-`docs/wiki/architecture.md` is the canonical high-level architecture page. Use it as the first durable reference before re-reading raw code.
+`docs/wiki/pages/architecture.md` is the canonical high-level architecture page. Use it as the first durable reference before re-reading raw code.
 
 ## Layer map
 

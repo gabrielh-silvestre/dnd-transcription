@@ -96,7 +96,7 @@ export class TranscriptionCliApplication {
     try {
       const parsed = this.argumentParser.parse(argv);
 
-      if (parsed.kind === "help") {
+      if (parsed.kind === "help" || parsed.kind === "version") {
         this.writeStdout(parsed.text);
         return 0;
       }

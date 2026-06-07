@@ -28,6 +28,14 @@ describe("translateCommanderError", () => {
     expect(result).toStrictEqual({ kind: "help" });
   });
 
+  it("trata commander.version como version", () => {
+    const result = translateCommanderError(
+      commanderError(0, "commander.version", "0.1.0"),
+    );
+
+    expect(result).toStrictEqual({ kind: "version" });
+  });
+
   it("traduz commander.unknownOption para PT", () => {
     const result = translateCommanderError(
       commanderError(1, "commander.unknownOption", "error: unknown option '--bogus'"),

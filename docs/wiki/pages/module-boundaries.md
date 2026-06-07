@@ -11,6 +11,8 @@ source_paths:
   - "src/cli/transcription-cli-application.ts"
   - "src/cli/default-transcriber-binding-factory.ts"
   - "src/application/run-transcription-job-use-case.ts"
+  - "src/application/run-batch-transcription-use-case.ts"
+  - "src/infrastructure/storage/file-batch-index-writer.ts"
   - "src/domain/entities/job.ts"
   - "src/domain/ports/transcriber-binding.ts"
   - "src/infrastructure/storage/file-job-store.ts"
@@ -22,7 +24,7 @@ source_paths:
   - "tests/unit/default-transcriber-binding-factory.test.ts"
   - "tests/unit/job.test.ts"
   - "tests/unit/task-pool.test.ts"
-last_refined_on: "2026-04-20"
+last_refined_on: "2026-06-06"
 ---
 # Module Boundaries
 
@@ -34,6 +36,7 @@ This page explains which layer owns each part of the transcription pipeline and 
 
 - The CLI layer owns user-facing concerns: argument parsing, input-path normalization, `.env` loading, dependency construction, and help output. It is also where the default provider binding is selected.
 - The application layer owns orchestration only. It computes the compatibility snapshot, initializes or resumes the job, drives the bounded task pool, triggers the final merge, and decides when cleanup happens.
+- A thin batch boundary sits above single-file orchestration. `RunBatchTranscriptionUseCase` accepts N inputs, runs each through the same per-file use case behind a `RunTranscriptionJobExecutorLike` seam, bounds cross-file parallelism with `fileConcurrency`, and delegates index persistence to a `BatchIndexWriter` (`FileBatchIndexWriter`) — keeping fan-out concerns out of the single-file pipeline.
 - The domain layer owns rules, not I/O. `Job` and `JobChunk` encode valid lifecycle transitions, resume reconciliation, and exit-code mapping, while the ports describe what external capabilities the workflow expects.
 - The infrastructure layer owns concrete effects. `FileJobStore` persists typed records to disk through a serialized mutation queue, `FFmpegMediaSegmenter` shells out to `ffmpeg` and `ffprobe`, and provider adapters translate between SDK responses and the normalized domain contract.
 - `TranscriberBinding` is the main seam between composition and execution. It lets the CLI choose a provider early while keeping real client creation lazy until the use case actually has pending chunks to process.

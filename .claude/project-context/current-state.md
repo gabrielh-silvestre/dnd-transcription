@@ -17,8 +17,8 @@
 
 1. `docs/wiki/index.md`
 2. `docs/wiki/schema.md`
-3. `docs/wiki/architecture.md`
-4. `docs/wiki/workflows/transcription-job.md`
+3. `docs/wiki/pages/architecture.md`
+4. `docs/wiki/pages/transcription-job.md`
 
 ## Key commands
 
