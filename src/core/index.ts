@@ -12,3 +12,10 @@ export {
   type OpenAIProviderConfig,
   type TranscriberBindingFactory,
 } from "./default-transcriber-binding-factory.js";
+export {
+  FAKE_PROVIDER,
+  SUPPORTED_PROVIDERS,
+  type SupportedProvider,
+  isSupportedProvider,
+  unsupportedProviderMessage,
+} from "./supported-providers.js";

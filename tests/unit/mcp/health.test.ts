@@ -10,6 +10,7 @@ function fakeInfra(overrides: Partial<ResolvedInfra> = {}): ResolvedInfra {
     provider: "openai-whisper",
     backend: "openai",
     model: "whisper-1",
+    allowedRoot: null,
     bindingFactory: { create: () => ({ signature: "sig", createTranscriber: () => ({}) }) as never },
     ...overrides,
   };

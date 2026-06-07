@@ -165,8 +165,12 @@ describe("MCP transcribe handler (in-process, fake provider + stub segmenter)", 
 });
 
 describe("MCP server protocol surface (tools/list + health round-trip)", () => {
-  async function connectClient() {
-    const infra = resolveInfra({ [MCP_PROVIDER_ENV_VAR]: "fake", FAKE_TRANSCRIBER_LATENCY_MS: "0" });
+  async function connectClient(envOverrides: NodeJS.ProcessEnv = {}) {
+    const infra = resolveInfra({
+      [MCP_PROVIDER_ENV_VAR]: "fake",
+      FAKE_TRANSCRIBER_LATENCY_MS: "0",
+      ...envOverrides,
+    });
     const server = createTranscriptionMcpServer({ infra });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test-client", version: "0.0.0" });
@@ -193,6 +197,30 @@ describe("MCP server protocol surface (tools/list + health round-trip)", () => {
     expect(keys.sort()).toStrictEqual(
       ["chunkDurationSeconds", "cleanupPolicy", "concurrency", "fileConcurrency", "inputs", "outputDir", "resume"].sort(),
     );
+  });
+
+  it("com MCP_ALLOWED_ROOT, transcribe rejeita (isError) input fora da raiz antes de tocar o filesystem", async () => {
+    const allowedRoot = await createTempDir("mcp-allowed-root");
+    const { client } = await connectClient({ MCP_ALLOWED_ROOT: allowedRoot });
+
+    const result = await client.callTool({
+      name: "transcribe",
+      arguments: {
+        inputs: ["/etc/passwd"],
+        outputDir: allowedRoot,
+        chunkDurationSeconds: 60,
+        concurrency: 1,
+        fileConcurrency: 1,
+        cleanupPolicy: "keep",
+        resume: false,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ type: string; text: string }>)
+      .map((part) => part.text)
+      .join("\n");
+    expect(text).toMatch(/MCP_ALLOWED_ROOT/);
   });
 
   it("transcription_health responde com provider/backend/ffmpeg sem expor secrets", async () => {

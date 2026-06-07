@@ -1,7 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 
+import { resolve } from "node:path";
+
 import {
   createPerCallBindingThunk,
+  MCP_ALLOWED_ROOT_ENV_VAR,
   MCP_PROVIDER_ENV_VAR,
   resolveInfra,
   type ResolvedInfra,
@@ -39,6 +42,27 @@ describe("resolveInfra", () => {
     expect(infra.provider).toBe("fake");
     expect(infra.backend).toBe("fake");
     expect(infra.model).toBeNull();
+  });
+
+  it("allowedRoot e null quando MCP_ALLOWED_ROOT esta ausente (sem contencao)", () => {
+    const infra = resolveInfra({ [MCP_PROVIDER_ENV_VAR]: "fake" });
+
+    expect(infra.allowedRoot).toBeNull();
+  });
+
+  it("allowedRoot e null quando MCP_ALLOWED_ROOT esta em branco", () => {
+    const infra = resolveInfra({ [MCP_PROVIDER_ENV_VAR]: "fake", [MCP_ALLOWED_ROOT_ENV_VAR]: "   " });
+
+    expect(infra.allowedRoot).toBeNull();
+  });
+
+  it("allowedRoot e resolvido para caminho absoluto quando MCP_ALLOWED_ROOT esta setado", () => {
+    const infra = resolveInfra({
+      [MCP_PROVIDER_ENV_VAR]: "fake",
+      [MCP_ALLOWED_ROOT_ENV_VAR]: "./media",
+    });
+
+    expect(infra.allowedRoot).toBe(resolve("./media"));
   });
 
   it("lanca quando MCP_TRANSCRIPTION_PROVIDER esta ausente", () => {
@@ -88,7 +112,7 @@ describe("resolveInfra", () => {
     // The ResolvedInfra surface the gateway holds/serializes for health/output
     // exposes only non-sensitive labels + the binding factory; no secret field.
     const keys = Object.keys(infra as unknown as Record<string, unknown>);
-    expect(keys.sort()).toStrictEqual(["backend", "bindingFactory", "model", "provider"].sort());
+    expect(keys.sort()).toStrictEqual(["allowedRoot", "backend", "bindingFactory", "model", "provider"].sort());
     expect(keys).not.toContain("apiKey");
     expect(keys).not.toContain("endpoint");
     expect(keys).not.toContain("secret");
@@ -104,6 +128,7 @@ describe("createPerCallBindingThunk", () => {
       provider: "openai-whisper",
       backend: "openai",
       model: "whisper-1",
+      allowedRoot: null,
       bindingFactory: {
         create(options) {
           calls.push(options);

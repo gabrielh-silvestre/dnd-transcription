@@ -9,11 +9,13 @@ source_paths:
   - "src/core/transcription-core.ts"
   - "src/core/default-transcriber-binding-factory.ts"
   - "src/core/transcriber-binding-input.ts"
+  - "src/core/supported-providers.ts"
   - "src/core/index.ts"
   - "src/cli/transcription-cli-application.ts"
   - "src/mcp/main.ts"
   - "src/mcp/server.ts"
   - "src/mcp/resolve-infra.ts"
+  - "src/mcp/assert-paths-within-root.ts"
   - "src/mcp/tool-schemas.ts"
   - "src/mcp/map-params-to-options.ts"
   - "src/mcp/map-result-to-output.ts"
@@ -24,7 +26,7 @@ source_paths:
   - "package.json"
   - "tests/integration/mcp-transcribe.test.ts"
   - ".omc/plans/mcp-core-gateway.md"
-last_refined_on: "2026-06-06"
+last_refined_on: "2026-06-07"
 ---
 # Core + Gateways (CLI and MCP)
 
@@ -152,9 +154,22 @@ absent** from every tool schema. They are read from env and validated at server
 startup via the existing `createXConfig(env)` throwers. Exposing them as tool
 params would let a caller override server infra/secrets per request, which the
 architecture forbids. The startup-validated infra is held in `ResolvedInfra`
-(`{ provider, backend, model, bindingFactory }`); `apiKey`/`endpoint` are
-intentionally **not** stored there — only the non-secret `backend`/`model`
-labels surface, and only for `transcription_health`.
+(`{ provider, backend, model, allowedRoot, bindingFactory }`); `apiKey`/`endpoint`
+are intentionally **not** stored there — only the non-secret `backend`/`model`
+labels (plus the optional `allowedRoot`) surface, and the labels only for
+`transcription_health`.
+
+**R3 — filesystem containment (`MCP_ALLOWED_ROOT`, opt-in).** The `transcribe`
+tool takes `inputs`/`outputDir` as agent-supplied paths. By default the gateway
+keeps the **same filesystem reach as the CLI** — the trust model is *local
+single-user, trusted LLM* (the server runs with the user's own privilege, just
+like the CLI shell). When defense-in-depth is wanted (e.g. a multi-user or
+less-trusted host), set `MCP_ALLOWED_ROOT`: `resolveInfra` resolves it to an
+absolute path and `handleTranscribe` runs `assertPathsWithinRoot` **before
+touching the filesystem**, so every resolved `input` and the `outputDir` must sit
+**at or under** the root. `..` escapes and absolutes outside the root are
+rejected as `ValidationError` → `isError` (never silently clamped). When the env
+is unset/blank, `allowedRoot` is `null` and the check is a no-op.
 
 **Per-call binding thunk.** `handleTranscribe` builds the binding thunk **fresh
 on every `tools/call`** via `createPerCallBindingThunk(infra, chunkDurationMs)`,
@@ -211,6 +226,10 @@ provider; the rest of the env matches the CLI's provider configuration exactly
 
 Only the two `openai-*` providers gate startup; `fake` is exempt by design
 (`resolveFakeTranscriberOptions` clamps/filters and never throws).
+
+`MCP_ALLOWED_ROOT` is an **optional, provider-independent** env (see R3 —
+filesystem containment): unset means CLI-equivalent reach; set means every
+`transcribe` path must resolve at or under that directory.
 
 ### Build & run
 
@@ -281,9 +300,20 @@ A typical MCP client config points at the bundle and supplies the infra env:
   paths. Adding deterministic evidence for the core and the gateways requires
   extending those page definitions (a code change), not just an `ingest`/`refresh`.
 - The MCP surface is V1: only `fake`, `openai-whisper`, and
-  `openai-transcription` are dispatched at startup. A new provider must be wired
-  in `DefaultTranscriberBindingFactory` (core) and in `resolveInfra` (MCP
-  startup dispatch) — the tool schema does not change.
+  `openai-transcription` are dispatched at startup. The supported set + the
+  unknown-provider message now live in one place — `src/core/supported-providers.ts`
+  (`SUPPORTED_PROVIDERS` / `unsupportedProviderMessage`) — consumed by both
+  `DefaultTranscriberBindingFactory` (core) and `resolveInfra` (MCP startup
+  dispatch); the parity test `tests/unit/core/supported-providers.test.ts` fails
+  if the two accept different sets. A new provider must still be wired into the
+  concrete dispatch in **both** places (factory → binding, `resolveInfra` →
+  backend/model labels) and added to `SUPPORTED_PROVIDERS`; the tool schema does
+  not change.
+- `transcription_health` is **stateless by design**: each call re-probes
+  ffmpeg/ffprobe (timeout-bounded via `runCommand`'s opt-in `timeoutMs`, so a
+  hung binary cannot wedge it) so the result reflects the live PATH. A short-TTL
+  availability cache is a documented `TODO OPT` if an agent ever polls health in
+  a tight loop.
 
 ## Related Pages
 

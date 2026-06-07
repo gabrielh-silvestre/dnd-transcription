@@ -19,6 +19,7 @@ import {
 } from "../infrastructure/providers/openai-whisper-config.js";
 import { type TranscriberBinding } from "../domain/ports/transcriber-binding.js";
 import { type Transcriber } from "../domain/ports/transcriber.js";
+import { FAKE_PROVIDER, unsupportedProviderMessage } from "./supported-providers.js";
 
 export type OpenAIProviderConfig = OpenAIWhisperConfig | OpenAITranscriptionConfig;
 
@@ -37,7 +38,7 @@ export class DefaultTranscriberBindingFactory implements TranscriberBindingFacto
   public create(options: TranscriberBindingInput): TranscriberBinding {
     const env = this.dependencies.env ?? process.env;
 
-    if (options.provider === "fake") {
+    if (options.provider === FAKE_PROVIDER) {
       return this.createFakeTranscriberBinding(env);
     }
 
@@ -51,7 +52,7 @@ export class DefaultTranscriberBindingFactory implements TranscriberBindingFacto
       return this.createConfiguredOpenAITranscriberBinding(config, options);
     }
 
-    throw new Error(`Provedor '${options.provider}' nao esta implementado nesta V1.`);
+    throw new Error(unsupportedProviderMessage(options.provider));
   }
 
   private createConfiguredOpenAITranscriber(config: OpenAIProviderConfig): Transcriber {

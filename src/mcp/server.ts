@@ -7,6 +7,7 @@ import { type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { runTranscriptionCore } from "../core/transcription-core.js";
 import { resolveAppVersion } from "../shared/app-version.js";
 import { ValidationError } from "../shared/errors.js";
+import { assertPathsWithinRoot } from "./assert-paths-within-root.js";
 import { resolveTranscriptionHealth } from "./health.js";
 import { mapErrorToToolOutput, mapResultToToolOutput } from "./map-result-to-output.js";
 import { mapParamsToRequest } from "./map-params-to-options.js";
@@ -85,6 +86,10 @@ async function handleTranscribe(
   const { logger, drain } = createStderrBufferLogger();
 
   try {
+    // R3 containment: reject any input/outputDir outside MCP_ALLOWED_ROOT (no-op
+    // when unset) BEFORE touching the filesystem. Throws -> isError via catch.
+    assertPathsWithinRoot([...params.inputs, params.outputDir], infra.allowedRoot);
+
     await assertOutputDirIsDirectory(params.outputDir);
 
     const { request, chunkDurationMs } = mapParamsToRequest(params);

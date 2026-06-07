@@ -1,7 +1,10 @@
+import { resolve } from "node:path";
+
 import {
   DefaultTranscriberBindingFactory,
   type TranscriberBindingFactory,
 } from "../core/default-transcriber-binding-factory.js";
+import { FAKE_PROVIDER, unsupportedProviderMessage } from "../core/supported-providers.js";
 import { type TranscriberBinding } from "../domain/ports/transcriber-binding.js";
 import { resolveFakeTranscriberOptions } from "../infrastructure/providers/fake-transcriber.js";
 import {
@@ -16,7 +19,13 @@ import { ValidationError } from "../shared/errors.js";
 
 export const MCP_PROVIDER_ENV_VAR = "MCP_TRANSCRIPTION_PROVIDER";
 
-const FAKE_PROVIDER = "fake" as const;
+/**
+ * Optional containment root (R3). When set, every agent-supplied path (each
+ * `transcribe` input plus `outputDir`) must resolve AT or UNDER this directory;
+ * anything outside is rejected. Absent means the gateway keeps the
+ * CLI-equivalent filesystem reach (trust model: local single-user, trusted LLM).
+ */
+export const MCP_ALLOWED_ROOT_ENV_VAR = "MCP_ALLOWED_ROOT";
 
 /**
  * The startup-validated infra the MCP gateway injects into every core call.
@@ -30,6 +39,11 @@ export interface ResolvedInfra {
   backend: string;
   /** Model label for `transcription_health` (null for the fake provider). */
   model: string | null;
+  /**
+   * Resolved `MCP_ALLOWED_ROOT` containment root, or `null` when unset (no
+   * containment). Non-secret — safe to hold/serialize alongside the labels.
+   */
+  allowedRoot: string | null;
   /** Factory bound to the startup env; the gateway calls it per request. */
   bindingFactory: TranscriberBindingFactory;
 }
@@ -60,27 +74,40 @@ export function resolveInfra(env: NodeJS.ProcessEnv = process.env): ResolvedInfr
   }
 
   const bindingFactory = new DefaultTranscriberBindingFactory({ env });
+  const allowedRoot = resolveAllowedRoot(env);
 
   if (provider === FAKE_PROVIDER) {
     // No-op validation by design (resolveFakeTranscriberOptions never throws).
     resolveFakeTranscriberOptions(env);
-    return { provider, backend: FAKE_PROVIDER, model: null, bindingFactory };
+    return { provider, backend: FAKE_PROVIDER, model: null, allowedRoot, bindingFactory };
   }
 
   if (provider === OPENAI_WHISPER_PROVIDER) {
     const config = createOpenAIWhisperConfig(env);
-    return { provider, backend: config.backend, model: config.model, bindingFactory };
+    return { provider, backend: config.backend, model: config.model, allowedRoot, bindingFactory };
   }
 
   if (provider === OPENAI_TRANSCRIPTION_PROVIDER) {
     const config = createOpenAITranscriptionConfig(env);
-    return { provider, backend: config.backend, model: config.model, bindingFactory };
+    return { provider, backend: config.backend, model: config.model, allowedRoot, bindingFactory };
   }
 
-  throw new ValidationError(
-    `Provedor '${provider}' nao esta implementado nesta V1.`,
-    "provider",
-  );
+  throw new ValidationError(unsupportedProviderMessage(provider), "provider");
+}
+
+/**
+ * Reads the optional `MCP_ALLOWED_ROOT` and returns it resolved to an absolute
+ * path, or `null` when unset/blank (no containment). Resolving here means the
+ * per-call path check compares against a stable absolute root.
+ */
+function resolveAllowedRoot(env: NodeJS.ProcessEnv): string | null {
+  const allowedRoot = env[MCP_ALLOWED_ROOT_ENV_VAR]?.trim();
+
+  if (allowedRoot === undefined || allowedRoot.length === 0) {
+    return null;
+  }
+
+  return resolve(allowedRoot);
 }
 
 /**
