@@ -39,6 +39,10 @@ export const INTEGER_FLAGS = new Set<string>([
   "--limit",
 ]);
 
+// 1 membro hoje → a mensagem de choices permanece literal de --cleanup-policy.
+// Se entrar uma 2ª choices-flag, parametrizar a mensagem por flag (ver follow-up no ADR).
+export const CHOICES_FLAGS = new Set<string>(["--cleanup-policy"]);
+
 export const STRING_VALUE_FLAGS = new Set<string>([
   "--input",
   "--output",
@@ -79,7 +83,7 @@ export function translateCommanderError(
   if (error.code === "commander.invalidArgument") {
     const flag = extractFlag(error.message);
 
-    if (error.message.includes("Allowed choices") || flag === "--cleanup-policy") {
+    if (error.message.includes("Allowed choices") || CHOICES_FLAGS.has(flag)) {
       return { message: "Flag --cleanup-policy deve ser 'on-success' ou 'keep'." };
     }
 
