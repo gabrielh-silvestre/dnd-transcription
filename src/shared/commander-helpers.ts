@@ -49,6 +49,8 @@ export const STRING_VALUE_FLAGS = new Set<string>([
 ]);
 
 function extractFlag(message: string): string {
+  // Acoplamento ao commander@15: a mensagem é `error: option '<flag> <placeholder>' ...`
+  // A regex captura o conteúdo entre aspas simples; o `.split(" ")[0]` descarta o placeholder.
   return message.match(/option '([^']+)'/)?.[1]?.split(" ")[0] ?? "";
 }
 
@@ -93,6 +95,8 @@ export function translateCommanderError(
   }
 
   if (error.code === "commander.excessArguments") {
+    // Acoplamento ao commander@15: a mensagem é `... got N: <tokens>.`
+    // A regex `got \d+: (.+)\.$` captura os tokens excedentes listados pelo commander.
     const token = error.message.match(/got \d+: (.+)\.$/)?.[1] ?? "";
 
     return { message: `Argumento inesperado: ${token}` };
