@@ -5,6 +5,8 @@ export function createPositiveIntegerParser(flag: string): (value: string) => nu
     const parsed = Number.parseInt(value, 10);
 
     if (!Number.isInteger(parsed) || parsed <= 0) {
+      // Mensagem PT placeholder — nunca chega ao usuário: `translateCommanderError`
+      // reconstrói a saída por categoria via `INTEGER_FLAGS`.
       throw new InvalidArgumentError(`Flag ${flag} deve ser um inteiro positivo.`);
     }
 
@@ -15,6 +17,8 @@ export function createPositiveIntegerParser(flag: string): (value: string) => nu
 export function createRejectDashDashParser(flag: string): (value: string) => string {
   return (value) => {
     if (value.startsWith("--")) {
+      // Mensagem PT placeholder — nunca chega ao usuário: `translateCommanderError`
+      // reconstrói a saída por categoria via `STRING_VALUE_FLAGS`.
       throw new InvalidArgumentError(`Flag ${flag} exige um valor.`);
     }
 
@@ -25,6 +29,8 @@ export function createRejectDashDashParser(flag: string): (value: string) => str
 export function collectRejectingDashDash(flag: string): (value: string, previous: string[]) => string[] {
   return (value, previous) => {
     if (value.startsWith("--")) {
+      // Mensagem PT placeholder — nunca chega ao usuário: `translateCommanderError`
+      // reconstrói a saída por categoria via `STRING_VALUE_FLAGS`.
       throw new InvalidArgumentError(`Flag ${flag} exige um valor.`);
     }
 
