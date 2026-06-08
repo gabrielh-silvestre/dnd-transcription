@@ -9,7 +9,6 @@ import {
 } from "./default-transcriber-binding-factory.js";
 import { InputPathResolver } from "./input-path-resolver.js";
 import {
-  RunBatchTranscriptionUseCase,
   type BatchFileResult,
   type BatchIndexWriter,
 } from "../application/run-batch-transcription-use-case.js";
@@ -18,17 +17,20 @@ import {
   type RunTranscriptionJobUseCaseInput,
   type RunTranscriptionJobUseCaseResult,
 } from "../application/run-transcription-job-use-case.js";
+import {
+  classifyBatchFileResult,
+  countBatchFailures,
+  runTranscriptionCore,
+  type TranscriptionRequest,
+} from "../core/transcription-core.js";
 import { type JobStore } from "../domain/ports/job-store.js";
 import { type MediaSegmenter } from "../domain/ports/media-segmenter.js";
 import { bindTranscriber, type TranscriberBinding } from "../domain/ports/transcriber-binding.js";
 import { type Transcriber } from "../domain/ports/transcriber.js";
-import { FFmpegMediaSegmenter } from "../infrastructure/media/ffmpeg-media-segmenter.js";
 import { FileBatchIndexWriter } from "../infrastructure/storage/file-batch-index-writer.js";
-import { FileJobStore } from "../infrastructure/storage/file-job-store.js";
 import { loadEnvFile } from "../shared/env-file.js";
 import { ValidationError } from "../shared/errors.js";
 import { createLogger, type Logger } from "../shared/logger.js";
-import { resolveJobPaths } from "../shared/paths.js";
 
 export interface CliDependencies extends DefaultTranscriberBindingFactoryDependencies {
   createLogger?: () => Logger;
@@ -108,33 +110,27 @@ export class TranscriptionCliApplication {
         cwd: this.dependencies.cwd,
       });
 
-      const createJobStore = (...args: [outputDir: string, resolvedInputPath?: string]) =>
-        this.dependencies.createJobStore?.(...args)
-          ?? new FileJobStore(resolveJobPaths(args[0]));
-      const createMediaSegmenter = (resolvedInputPath: string) =>
-        this.dependencies.createMediaSegmenter?.(resolvedInputPath)
-          ?? new FFmpegMediaSegmenter();
-      const createTranscriberBinding = (resolvedInputPath: string) =>
-        this.resolveTranscriberBinding(resolvedInputPath, normalizedOptions, env);
-
-      const batch = new RunBatchTranscriptionUseCase({
-        executor: this.runTranscriptionJobUseCase,
-        batchIndexWriter: this.batchIndexWriter,
-      });
-      const result = await batch.execute({
-        inputPaths: normalizedOptions.inputPaths,
-        outputDir: normalizedOptions.outputDir,
+      const request: TranscriptionRequest = {
+        inputs: normalizedOptions.inputPaths,
+        output: normalizedOptions.outputDir,
         chunkDurationSeconds: normalizedOptions.chunkDurationSeconds,
-        chunkDurationMs: normalizedOptions.chunkDurationMs,
         concurrency: normalizedOptions.concurrency,
         fileConcurrency: normalizedOptions.fileConcurrency,
-        provider: normalizedOptions.provider,
         cleanupPolicy: normalizedOptions.cleanupPolicy,
         resume: normalizedOptions.resume,
-        createJobStore,
-        createMediaSegmenter,
-        createTranscriberBinding,
+      };
+
+      const result = await runTranscriptionCore({
+        request,
+        provider: normalizedOptions.provider,
+        chunkDurationMs: normalizedOptions.chunkDurationMs,
         logger,
+        createTranscriberBinding: (resolvedInputPath) =>
+          this.resolveTranscriberBinding(resolvedInputPath, normalizedOptions, env),
+        createJobStore: this.dependencies.createJobStore,
+        createMediaSegmenter: this.dependencies.createMediaSegmenter,
+        runTranscriptionJobUseCase: this.runTranscriptionJobUseCase,
+        batchIndexWriter: this.batchIndexWriter,
       });
 
       this.logBatchSummary(logger, result.fileResults);
@@ -199,17 +195,16 @@ export class TranscriptionCliApplication {
         errorSummary: fileResult.errorSummary,
       };
 
-      if (fileResult.exitCode === 2) {
+      if (classifyBatchFileResult(fileResult.exitCode) === "partial") {
         logger.warn("batch", "Arquivo encerrou com falha parcial.", metadata);
       } else {
         logger.error("batch", "Arquivo encerrou com erro fatal.", metadata);
       }
     }
 
-    const failures = fileResults.filter((fileResult) => fileResult.exitCode !== 0).length;
     logger.info("batch", "Batch concluido.", {
       total: fileResults.length,
-      failures,
+      failures: countBatchFailures(fileResults),
     });
   }
 }
