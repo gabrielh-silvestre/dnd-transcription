@@ -10,7 +10,7 @@ import { ValidationError } from "../shared/errors.js";
 import { assertPathsWithinRoot } from "./assert-paths-within-root.js";
 import { resolveTranscriptionHealth } from "./health.js";
 import { mapErrorToToolOutput, mapResultToToolOutput } from "./map-result-to-output.js";
-import { mapParamsToRequest } from "./map-params-to-options.js";
+import { mapParamsToRequest } from "./map-params-to-request.js";
 import { createPerCallBindingThunk, type ResolvedInfra } from "./resolve-infra.js";
 import { createStderrBufferLogger } from "./stderr-logger.js";
 import {
@@ -71,7 +71,7 @@ export function createTranscriptionMcpServer(
 
       return {
         content: [{ type: "text", text: JSON.stringify(health, null, 2) }],
-        structuredContent: health as unknown as Record<string, unknown>,
+        structuredContent: { ...health },
       };
     },
   );

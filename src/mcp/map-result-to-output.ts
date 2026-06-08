@@ -1,6 +1,11 @@
 import { type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
-import { type BatchFileResult, type TranscriptionCoreResult } from "../core/transcription-core.js";
+import {
+  classifyBatchFileResult,
+  countBatchFailures,
+  type BatchFileResult,
+  type TranscriptionCoreResult,
+} from "../core/transcription-core.js";
 
 /**
  * Builds the human-readable summary text for a batch result, replicating the
@@ -10,7 +15,7 @@ import { type BatchFileResult, type TranscriptionCoreResult } from "../core/tran
  */
 export function summarizeBatch(result: TranscriptionCoreResult): string {
   const total = result.fileResults.length;
-  const failures = result.fileResults.filter((file) => file.exitCode !== 0).length;
+  const failures = countBatchFailures(result.fileResults);
 
   const lines = [
     `Batch concluido. exitCode=${result.exitCode} total=${total} failures=${failures}.`,
@@ -21,7 +26,7 @@ export function summarizeBatch(result: TranscriptionCoreResult): string {
       continue;
     }
 
-    const kind = file.exitCode === 2 ? "falha parcial" : "erro fatal";
+    const kind = classifyBatchFileResult(file.exitCode) === "partial" ? "falha parcial" : "erro fatal";
     lines.push(formatFailureLine(kind, file));
   }
 
@@ -67,7 +72,7 @@ export function mapResultToToolOutput(
     content: [{ type: "text", text }],
     structuredContent: {
       exitCode: result.exitCode,
-      fileResults: result.fileResults as unknown as Record<string, unknown>[],
+      fileResults: result.fileResults.map((f) => ({ ...f })),
     },
   };
 

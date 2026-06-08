@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { mapParamsToRequest } from "../../../src/mcp/map-params-to-options.js";
+import { mapParamsToRequest } from "../../../src/mcp/map-params-to-request.js";
 import { type TranscribeToolInput } from "../../../src/mcp/tool-schemas.js";
 
 function createParams(overrides: Partial<TranscribeToolInput> = {}): TranscribeToolInput {

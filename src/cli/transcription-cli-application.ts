@@ -17,7 +17,12 @@ import {
   type RunTranscriptionJobUseCaseInput,
   type RunTranscriptionJobUseCaseResult,
 } from "../application/run-transcription-job-use-case.js";
-import { runTranscriptionCore, type TranscriptionRequest } from "../core/transcription-core.js";
+import {
+  classifyBatchFileResult,
+  countBatchFailures,
+  runTranscriptionCore,
+  type TranscriptionRequest,
+} from "../core/transcription-core.js";
 import { type JobStore } from "../domain/ports/job-store.js";
 import { type MediaSegmenter } from "../domain/ports/media-segmenter.js";
 import { bindTranscriber, type TranscriberBinding } from "../domain/ports/transcriber-binding.js";
@@ -190,17 +195,16 @@ export class TranscriptionCliApplication {
         errorSummary: fileResult.errorSummary,
       };
 
-      if (fileResult.exitCode === 2) {
+      if (classifyBatchFileResult(fileResult.exitCode) === "partial") {
         logger.warn("batch", "Arquivo encerrou com falha parcial.", metadata);
       } else {
         logger.error("batch", "Arquivo encerrou com erro fatal.", metadata);
       }
     }
 
-    const failures = fileResults.filter((fileResult) => fileResult.exitCode !== 0).length;
     logger.info("batch", "Batch concluido.", {
       total: fileResults.length,
-      failures,
+      failures: countBatchFailures(fileResults),
     });
   }
 }

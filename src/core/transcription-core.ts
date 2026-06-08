@@ -69,9 +69,9 @@ export type { BatchFileResult };
 export async function runTranscriptionCore(
   input: TranscriptionCoreInput,
 ): Promise<TranscriptionCoreResult> {
-  const createJobStore = (...args: [outputDir: string, resolvedInputPath?: string]) =>
-    input.createJobStore?.(...args)
-      ?? new FileJobStore(resolveJobPaths(args[0]));
+  const createJobStore = (outputDir: string, resolvedInputPath?: string) =>
+    input.createJobStore?.(outputDir, resolvedInputPath)
+      ?? new FileJobStore(resolveJobPaths(outputDir));
   const createMediaSegmenter = (resolvedInputPath: string) =>
     input.createMediaSegmenter?.(resolvedInputPath)
       ?? new FFmpegMediaSegmenter();
@@ -96,4 +96,20 @@ export async function runTranscriptionCore(
     createTranscriberBinding: input.createTranscriberBinding,
     logger: input.logger,
   });
+}
+
+/**
+ * Shared classification rule: exit code 2 is partial failure (some chunks
+ * succeeded); any other non-zero code is fatal. Both gateways use this so the
+ * domain concept lives in one place.
+ */
+export function classifyBatchFileResult(exitCode: number): "partial" | "fatal" {
+  return exitCode === 2 ? "partial" : "fatal";
+}
+
+/** Counts files with non-zero exit codes across a batch result. */
+export function countBatchFailures(
+  fileResults: Pick<BatchFileResult, "exitCode">[],
+): number {
+  return fileResults.filter((f) => f.exitCode !== 0).length;
 }

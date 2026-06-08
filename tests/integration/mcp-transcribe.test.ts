@@ -7,7 +7,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it } from "@jest/globals";
 
 import { runTranscriptionCore, type TranscriptionRequest } from "../../src/core/transcription-core.js";
-import { mapParamsToRequest } from "../../src/mcp/map-params-to-options.js";
+import { mapParamsToRequest } from "../../src/mcp/map-params-to-request.js";
 import { mapResultToToolOutput } from "../../src/mcp/map-result-to-output.js";
 import { createPerCallBindingThunk, resolveInfra, MCP_PROVIDER_ENV_VAR } from "../../src/mcp/resolve-infra.js";
 import { createTranscriptionMcpServer } from "../../src/mcp/server.js";
