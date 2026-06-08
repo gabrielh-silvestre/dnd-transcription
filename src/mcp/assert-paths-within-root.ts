@@ -12,6 +12,11 @@ import { ValidationError } from "../shared/errors.js";
  *
  * Relative candidates are resolved against the server process `cwd`, matching
  * how the core resolves them, so the check and the actual I/O agree.
+ *
+ * **Limite — symlink-escape:** a checagem usa `path.resolve` (não `fs.realpath`),
+ * portanto um symlink dentro do root apontando para fora do root passa pelo check.
+ * // TODO OPT: trocar por `realpath` + re-check pós-I/O para eliminar symlink-escape
+ * // e a janela de TOCTOU, se o trust model endurecer além do local single-user.
  */
 export function assertPathsWithinRoot(paths: readonly string[], allowedRoot: string | null): void {
   if (allowedRoot === null) {

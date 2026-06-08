@@ -5,6 +5,8 @@ export function createPositiveIntegerParser(flag: string): (value: string) => nu
     const parsed = Number.parseInt(value, 10);
 
     if (!Number.isInteger(parsed) || parsed <= 0) {
+      // Mensagem PT placeholder — nunca chega ao usuário: `translateCommanderError`
+      // reconstrói a saída por categoria via `INTEGER_FLAGS`.
       throw new InvalidArgumentError(`Flag ${flag} deve ser um inteiro positivo.`);
     }
 
@@ -15,6 +17,8 @@ export function createPositiveIntegerParser(flag: string): (value: string) => nu
 export function createRejectDashDashParser(flag: string): (value: string) => string {
   return (value) => {
     if (value.startsWith("--")) {
+      // Mensagem PT placeholder — nunca chega ao usuário: `translateCommanderError`
+      // reconstrói a saída por categoria via `STRING_VALUE_FLAGS`.
       throw new InvalidArgumentError(`Flag ${flag} exige um valor.`);
     }
 
@@ -25,6 +29,8 @@ export function createRejectDashDashParser(flag: string): (value: string) => str
 export function collectRejectingDashDash(flag: string): (value: string, previous: string[]) => string[] {
   return (value, previous) => {
     if (value.startsWith("--")) {
+      // Mensagem PT placeholder — nunca chega ao usuário: `translateCommanderError`
+      // reconstrói a saída por categoria via `STRING_VALUE_FLAGS`.
       throw new InvalidArgumentError(`Flag ${flag} exige um valor.`);
     }
 
@@ -39,6 +45,10 @@ export const INTEGER_FLAGS = new Set<string>([
   "--limit",
 ]);
 
+// 1 membro hoje → a mensagem de choices permanece literal de --cleanup-policy.
+// Se entrar uma 2ª choices-flag, parametrizar a mensagem por flag (ver follow-up no ADR).
+export const CHOICES_FLAGS = new Set<string>(["--cleanup-policy"]);
+
 export const STRING_VALUE_FLAGS = new Set<string>([
   "--input",
   "--output",
@@ -49,6 +59,8 @@ export const STRING_VALUE_FLAGS = new Set<string>([
 ]);
 
 function extractFlag(message: string): string {
+  // Acoplamento ao commander@15: a mensagem é `error: option '<flag> <placeholder>' ...`
+  // A regex captura o conteúdo entre aspas simples; o `.split(" ")[0]` descarta o placeholder.
   return message.match(/option '([^']+)'/)?.[1]?.split(" ")[0] ?? "";
 }
 
@@ -77,7 +89,7 @@ export function translateCommanderError(
   if (error.code === "commander.invalidArgument") {
     const flag = extractFlag(error.message);
 
-    if (error.message.includes("Allowed choices") || flag === "--cleanup-policy") {
+    if (error.message.includes("Allowed choices") || CHOICES_FLAGS.has(flag)) {
       return { message: "Flag --cleanup-policy deve ser 'on-success' ou 'keep'." };
     }
 
@@ -93,6 +105,8 @@ export function translateCommanderError(
   }
 
   if (error.code === "commander.excessArguments") {
+    // Acoplamento ao commander@15: a mensagem é `... got N: <tokens>.`
+    // A regex `got \d+: (.+)\.$` captura os tokens excedentes listados pelo commander.
     const token = error.message.match(/got \d+: (.+)\.$/)?.[1] ?? "";
 
     return { message: `Argumento inesperado: ${token}` };

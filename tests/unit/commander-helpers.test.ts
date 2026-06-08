@@ -2,6 +2,7 @@ import { CommanderError } from "commander";
 import { describe, expect, it } from "@jest/globals";
 
 import {
+  CHOICES_FLAGS,
   INTEGER_FLAGS,
   STRING_VALUE_FLAGS,
   translateCommanderError,
@@ -249,6 +250,38 @@ describe("translateCommanderError", () => {
         );
 
         expect(result).toStrictEqual({ message: `Flag ${flag} exige um valor.` });
+      });
+    }
+
+    for (const flag of CHOICES_FLAGS) {
+      // Caso (a) — ramo histórico: mensagem nativa do commander contém "Allowed choices".
+      it(`flag de choices ${flag}: ramo "Allowed choices" cai na categoria de choices`, () => {
+        const result = translateCommanderError(
+          commanderError(
+            1,
+            "commander.invalidArgument",
+            `error: option '${flag} <x>' argument 'z' is invalid. Allowed choices are on-success, keep.`,
+          ),
+        );
+
+        expect(result).toStrictEqual({
+          message: "Flag --cleanup-policy deve ser 'on-success' ou 'keep'.",
+        });
+      });
+
+      // Caso (b) — ramo-tabela novo: mensagem SEM "Allowed choices", só a flag em CHOICES_FLAGS.
+      it(`flag de choices ${flag}: ramo CHOICES_FLAGS cai na categoria de choices, nao no fallback`, () => {
+        const result = translateCommanderError(
+          commanderError(
+            1,
+            "commander.invalidArgument",
+            `error: option '${flag} <x>' argument 'z' is invalid. qualquer sufixo.`,
+          ),
+        );
+
+        expect(result).toStrictEqual({
+          message: "Flag --cleanup-policy deve ser 'on-success' ou 'keep'.",
+        });
       });
     }
   });

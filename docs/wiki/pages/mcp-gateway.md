@@ -17,7 +17,7 @@ source_paths:
   - "src/mcp/resolve-infra.ts"
   - "src/mcp/assert-paths-within-root.ts"
   - "src/mcp/tool-schemas.ts"
-  - "src/mcp/map-params-to-options.ts"
+  - "src/mcp/map-params-to-request.ts"
   - "src/mcp/map-result-to-output.ts"
   - "src/mcp/health.ts"
   - "src/mcp/stderr-logger.ts"
@@ -171,6 +171,16 @@ touching the filesystem**, so every resolved `input` and the `outputDir` must si
 rejected as `ValidationError` → `isError` (never silently clamped). When the env
 is unset/blank, `allowedRoot` is `null` and the check is a no-op.
 
+**Limites do containment.** A checagem é **lexical**: usa `path.resolve` (não
+`fs.realpath`), portanto um symlink dentro do root que aponte para fora do root
+**não é detectado** (symlink-escape). Também não há proteção TOCTOU — o caminho
+pode mudar entre o check e o I/O efetivo. Esses limites são aceitáveis no trust
+model padrão (*local single-user, trusted LLM*); usar `realpath`/anti-TOCTOU é
+um `TODO OPT` para cenários de trust model mais restrito. Invariante adicional:
+**o gateway MCP nunca faz `chdir`** — caminhos relativos resolvem sempre contra
+o `cwd` do processo do servidor, igual ao core, garantindo que check e I/O
+concordem sem surpresas.
+
 **Per-call binding thunk.** `handleTranscribe` builds the binding thunk **fresh
 on every `tools/call`** via `createPerCallBindingThunk(infra, chunkDurationMs)`,
 so `assertOpenAIAudioChunkFitsUploadLimit` fires per call against *this*
@@ -205,7 +215,7 @@ writes INFO/WARN to stdout) must never be used here.
 `transcription-cli-application`, `cli-argument-parser`, or `runCli`, and must
 never `spawn`/`exec` the CLI bundle. It depends only on `src/core/**` (plus
 `application`/`infrastructure`/`domain`/`shared`). The `seconds * 1000`
-conversion is inlined in `map-params-to-options.ts` specifically to avoid
+conversion is inlined in `map-params-to-request.ts` specifically to avoid
 importing the CLI's `toChunkDurationMs`. The only CLI leaf that may be reused is
 `input-path-resolver`. This isolation is testable at the bundle level: esbuild
 emits two separate ESM bundles, and `@modelcontextprotocol/sdk` is absent from
@@ -279,13 +289,13 @@ A typical MCP client config points at the bundle and supplies the infra env:
   `src/core/transcriber-binding-input.ts`, `src/core/index.ts`,
   `src/cli/transcription-cli-application.ts`, `src/mcp/main.ts`,
   `src/mcp/server.ts`, `src/mcp/resolve-infra.ts`, `src/mcp/tool-schemas.ts`,
-  `src/mcp/map-params-to-options.ts`, `src/mcp/map-result-to-output.ts`,
+  `src/mcp/map-params-to-request.ts`, `src/mcp/map-result-to-output.ts`,
   `src/mcp/health.ts`, `src/mcp/stderr-logger.ts`, `src/mcp/AGENTS.md`,
   `esbuild.config.mjs`, `package.json`, the provider config factories, and the
   plan `.omc/plans/mcp-core-gateway.md`.
 - Verification spot-checks: `tests/integration/mcp-transcribe.test.ts` plus the
   `tests/unit/mcp/*` suites (`resolve-infra`, `tool-schemas`,
-  `map-params-to-options`, `map-result-to-output`, `health`, `stderr-logger`).
+  `map-params-to-request`, `map-result-to-output`, `health`, `stderr-logger`).
   Per the `c802534` commit message, the full suite is 202/202 green; stdout
   purity is asserted (0 `process.stdout.write` in the handler) and a fail-fast
   smoke test (`openai-whisper` without `OPENAI_API_KEY`) exits 1 with empty
