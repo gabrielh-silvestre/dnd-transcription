@@ -183,3 +183,9 @@ Append-only record of code wiki maintenance operations.
 - unindexed pages: 0
 - orphan pages: 0
 - broken links: 0
+## [2026-06-08] lint | Code Wiki Health Check
+
+- missing required pages: 0
+- unindexed pages: 0
+- orphan pages: 0
+- broken links: 0
